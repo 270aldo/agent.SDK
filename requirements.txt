@@ -1,0 +1,29 @@
+# API y Servidor
+fastapi==0.103.1
+uvicorn==0.23.2
+pydantic==2.4.2
+
+# OpenAI e IA
+openai
+openai-agents
+langchain==0.0.312
+
+# Procesamiento de voz
+elevenlabs
+librosa==0.10.1
+soundfile==0.12.1
+
+# Base de datos y caché
+sqlalchemy==2.0.22
+supabase
+asyncpg==0.28.0
+
+# Utilidades
+python-dotenv==1.0.0
+httpx==0.25.0
+pyjwt==2.8.0
+tenacity==8.2.3
+
+# Testing
+pytest==7.4.2
+pytest-asyncio==0.21.1 
