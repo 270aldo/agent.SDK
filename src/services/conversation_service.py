@@ -28,6 +28,9 @@ from src.agents.mock_agent import MockAgent, MockRunner
 # Importar servicios adicionales
 from src.services.intent_analysis_service import IntentAnalysisService
 from src.services.qualification_service import LeadQualificationService
+from src.services.human_transfer_service import HumanTransferService
+from src.services.follow_up_service import FollowUpService
+from src.services.personalization_service import PersonalizationService
 
 # Configurar logging
 logger = logging.getLogger(__name__)
@@ -47,6 +50,9 @@ class ConversationService:
         # Inicializar servicios adicionales
         self.intent_analysis_service = IntentAnalysisService()
         self.qualification_service = LeadQualificationService()
+        self.human_transfer_service = HumanTransferService()
+        self.follow_up_service = FollowUpService()
+        self.personalization_service = PersonalizationService()
     
     async def start_conversation(self, customer_data: CustomerData, program_type: str = "PRIME") -> ConversationState:
         """
@@ -124,6 +130,47 @@ class ConversationService:
             raise ValueError(f"No se encontró conversación con ID {conversation_id}")
         
         state.add_message(role="user", content=message_text)
+        
+        # Verificar si es una solicitud de transferencia a agente humano
+        is_transfer_request = self.human_transfer_service.detect_transfer_request(message_text)
+        
+        if is_transfer_request:
+            # Registrar solicitud de transferencia
+            try:
+                transfer_request = await self.human_transfer_service.request_human_transfer(
+                    conversation_id=state.id,
+                    user_id=state.customer_id,
+                    reason="Solicitud explícita del usuario"
+                )
+                
+                # Guardar ID de solicitud en el estado de la conversación
+                state.transfer_request_id = transfer_request.get('id')
+                state.transfer_status = 'requested'
+                
+                # Generar mensaje de transferencia
+                response_text = self.human_transfer_service.generate_transfer_message(wait_time=2)
+                
+                state.add_message(role="assistant", content=response_text)
+                state.updated_at = datetime.now()
+                await self._save_conversation_state(state)
+                
+                # Generar audio de respuesta
+                customer_gender = "male"
+                if state.customer_data and isinstance(state.customer_data, dict):
+                    customer_gender = state.customer_data.get("gender", "male")
+                
+                audio_stream = await voice_engine.text_to_speech_async(
+                    text=response_text,
+                    program_type=state.program_type,
+                    gender=customer_gender
+                )
+                
+                logger.info(f"Solicitud de transferencia a humano registrada para conversación {state.id}")
+                return state, audio_stream
+                
+            except Exception as e:
+                logger.error(f"Error al procesar solicitud de transferencia: {e}")
+                # Continuar con el flujo normal si hay un error
         
         # Verificar si debemos aplicar el corte inteligente
         if check_intent and hasattr(state, 'session_start_time') and hasattr(state, 'intent_detection_timeout'):
@@ -280,6 +327,66 @@ class ConversationService:
         state.updated_at = datetime.now()
         await self._save_conversation_state(state)
         
+        # Analizar intención de compra para programar seguimiento
+        try:
+            # Obtener todas las conversaciones para analizar intención
+            formatted_history = state.get_formatted_message_history()
+            intent_analysis = self.intent_analysis_service.analyze_purchase_intent(formatted_history)
+            
+            # Si hay alta intención de compra, programar seguimiento
+            if intent_analysis["has_purchase_intent"] and intent_analysis["purchase_intent_probability"] >= 0.6:
+                # Obtener nombre del usuario
+                user_name = "Cliente"
+                if state.customer_data and isinstance(state.customer_data, dict):
+                    user_name = state.customer_data.get("name", "Cliente").split()[0]
+                
+                # Programar seguimiento para alta intención
+                follow_up = await self.follow_up_service.schedule_follow_up(
+                    user_id=state.customer_id,
+                    conversation_id=state.id,
+                    follow_up_type="high_intent",
+                    days_delay=1  # Seguimiento al día siguiente
+                )
+                
+                logger.info(f"Seguimiento programado para conversación {state.id} con alta intención de compra")
+                
+            # Si hay objeciones pero no rechazo total, programar seguimiento para manejo de objeciones
+            elif intent_analysis["rejection_indicators"] and not intent_analysis["has_rejection"]:
+                # Obtener nombre del usuario
+                user_name = "Cliente"
+                if state.customer_data and isinstance(state.customer_data, dict):
+                    user_name = state.customer_data.get("name", "Cliente").split()[0]
+                
+                # Programar seguimiento para manejo de objeciones
+                follow_up = await self.follow_up_service.schedule_follow_up(
+                    user_id=state.customer_id,
+                    conversation_id=state.id,
+                    follow_up_type="objection_handling",
+                    days_delay=2  # Seguimiento a los 2 días
+                )
+                
+                logger.info(f"Seguimiento programado para conversación {state.id} para manejo de objeciones")
+            
+            # Si hubo transferencia a humano, programar seguimiento de transferencia
+            elif hasattr(state, 'transfer_request_id') and state.transfer_request_id:
+                # Obtener nombre del usuario
+                user_name = "Cliente"
+                if state.customer_data and isinstance(state.customer_data, dict):
+                    user_name = state.customer_data.get("name", "Cliente").split()[0]
+                
+                # Programar seguimiento para transferencia
+                follow_up = await self.follow_up_service.schedule_follow_up(
+                    user_id=state.customer_id,
+                    conversation_id=state.id,
+                    follow_up_type="transfer_follow_up",
+                    days_delay=1  # Seguimiento al día siguiente
+                )
+                
+                logger.info(f"Seguimiento programado para conversación {state.id} después de transferencia a humano")
+        
+        except Exception as e:
+            logger.error(f"Error al programar seguimiento: {e}")
+        
         logger.info(f"Conversación {conversation_id} finalizada")
         return state
     
@@ -294,16 +401,36 @@ class ConversationService:
         Returns:
             str: Mensaje de bienvenida
         """
-        name = customer_data.name.split()[0]  # Primer nombre
+        # Convertir CustomerData a diccionario para el servicio de personalización
+        user_data = customer_data.model_dump(mode='json')
         
+        # Generar saludo personalizado según el perfil del usuario
+        personalized_greeting = self.personalization_service.generate_personalized_greeting(user_data)
+        
+        # Añadir información específica del programa
         if program_type == "PRIME":
-            return f"Hola {name}, soy tu asesor de NGX PRIME. Gracias por completar nuestra evaluación de optimización biológica. Veo que tienes interés en mejorar tu rendimiento cognitivo y energía. ¿Es un buen momento para hablar sobre cómo nuestro programa podría ayudarte a lograr tus objetivos?"
+            program_info = "Soy tu asistente de NGX Prime."
         else:  # LONGEVITY
-            return f"Hola {name}, soy tu asesor de NGX LONGEVITY. Gracias por completar nuestra evaluación de vitalidad y bienestar. Veo que estás interesado en mantener tu independencia funcional y mejorar tu calidad de vida. ¿Te parece bien si conversamos sobre cómo nuestro programa podría adaptarse a tus necesidades específicas?"
+            program_info = "Soy tu asistente de NGX Longevity."
+            
+        # Determinar el perfil de comunicación
+        profile = self.personalization_service.determine_communication_profile(user_data)
+        
+        # Ajustar la presentación según el perfil
+        if profile == 'formal':
+            greeting = f"{personalized_greeting} {program_info} ¿En qué puedo asistirle hoy?"
+        elif profile == 'enthusiastic':
+            greeting = f"{personalized_greeting} ¡{program_info}! ¿En qué puedo ayudarte hoy? ¡Estoy aquí para ti!"
+        elif profile == 'technical':
+            greeting = f"{personalized_greeting} {program_info} Estoy aquí para proporcionarte información detallada sobre nuestro programa. ¿En qué área específica puedo ayudarte?"
+        else:  # casual
+            greeting = f"{personalized_greeting} {program_info} ¿En qué puedo ayudarte hoy?"
+            
+        return greeting
     
     async def _get_conversation_state(self, conversation_id: str) -> Optional[ConversationState]:
         """
-        Recuperar el estado de una conversación desde Supabase.
+{{ ... }}
         
         Args:
             conversation_id (str): ID de la conversación
