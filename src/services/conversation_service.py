@@ -27,6 +27,7 @@ from src.agents.mock_agent import MockAgent, MockRunner
 
 # Importar servicios adicionales
 from src.services.intent_analysis_service import IntentAnalysisService
+from src.services.enhanced_intent_analysis_service import EnhancedIntentAnalysisService
 from src.services.qualification_service import LeadQualificationService
 from src.services.human_transfer_service import HumanTransferService
 from src.services.follow_up_service import FollowUpService
@@ -41,14 +42,18 @@ class ConversationService:
     y persistencia (Supabase) para gestionar las conversaciones con clientes.
     """
     
-    def __init__(self):
+    def __init__(self, industry: str = 'salud'):
         """
         Inicializar el servicio de conversación.
+        
+        Args:
+            industry: Industria para personalizar el análisis de intención
         """
-        logger.info("Servicio de conversación inicializado para usar OpenAI Agents SDK")
+        logger.info(f"Servicio de conversación inicializado para usar OpenAI Agents SDK (Industria: {industry})")
         
         # Inicializar servicios adicionales
-        self.intent_analysis_service = IntentAnalysisService()
+        self.intent_analysis_service = IntentAnalysisService()  # Mantener para compatibilidad
+        self.enhanced_intent_service = EnhancedIntentAnalysisService(industry=industry)
         self.qualification_service = LeadQualificationService()
         self.human_transfer_service = HumanTransferService()
         self.follow_up_service = FollowUpService()
@@ -131,21 +136,49 @@ class ConversationService:
         
         state.add_message(role="user", content=message_text)
         
-        # Verificar si es una solicitud de transferencia a agente humano
-        is_transfer_request = self.human_transfer_service.detect_transfer_request(message_text)
+        # Analizar intención de compra con el servicio mejorado
+        enhanced_intent_analysis = self.enhanced_intent_service.analyze_purchase_intent(state.get_formatted_message_history())
+        logger.info(f"Análisis mejorado de intención para conversación {conversation_id}: {enhanced_intent_analysis}")
         
-        if is_transfer_request:
-            # Registrar solicitud de transferencia
+        # Guardar resultados del análisis en Supabase para aprendizaje continuo
+        try:
+            analysis_data = {
+                "conversation_id": conversation_id,
+                "user_id": state.customer_id,
+                "purchase_intent_probability": enhanced_intent_analysis["purchase_intent_probability"],
+                "has_purchase_intent": enhanced_intent_analysis["has_purchase_intent"],
+                "has_rejection": enhanced_intent_analysis["has_rejection"],
+                "intent_indicators": json.dumps(enhanced_intent_analysis["intent_indicators"]),
+                "rejection_indicators": json.dumps(enhanced_intent_analysis["rejection_indicators"]),
+                "sentiment_score": enhanced_intent_analysis["sentiment_score"],
+                "engagement_score": enhanced_intent_analysis["engagement_score"],
+                "industry": self.enhanced_intent_service.industry,
+                "model_id": self.enhanced_intent_service.intent_model.get("id")
+            }
+            
+            supabase_client.table("intent_analysis_results").insert(analysis_data).execute()
+        except Exception as e:
+            logger.error(f"Error al guardar análisis de intención: {e}")
+        
+        # Actualizar estado con resultados del análisis
+        state.intent_analysis_results = enhanced_intent_analysis
+        
+        # Verificar si el usuario ha solicitado hablar con un agente humano
+        transfer_requested = self.human_transfer_service.detect_transfer_request(message_text)
+        
+        if transfer_requested:
             try:
-                transfer_request = await self.human_transfer_service.request_human_transfer(
-                    conversation_id=state.id,
-                    user_id=state.customer_id,
-                    reason="Solicitud explícita del usuario"
+                logger.info(f"Usuario ha solicitado transferencia a agente humano en conversación {conversation_id}")
+                # Registrar solicitud de transferencia
+                transfer_result = await self.human_transfer_service.register_transfer_request(
+                    conversation_id, 
+                    state.customer_id
                 )
                 
-                # Guardar ID de solicitud en el estado de la conversación
-                state.transfer_request_id = transfer_request.get('id')
-                state.transfer_status = 'requested'
+                # Actualizar estado de la conversación
+                state.human_transfer_requested = True
+                state.human_transfer_status = "pending"
+                state.human_transfer_request_id = transfer_result.get("id")
                 
                 # Generar mensaje de transferencia
                 response_text = self.human_transfer_service.generate_transfer_message(wait_time=2)
@@ -167,14 +200,13 @@ class ConversationService:
                 
                 logger.info(f"Solicitud de transferencia a humano registrada para conversación {state.id}")
                 return state, audio_stream
-                
             except Exception as e:
                 logger.error(f"Error al procesar solicitud de transferencia: {e}")
                 # Continuar con el flujo normal si hay un error
         
-        # Verificar si debemos aplicar el corte inteligente
+        # Verificar si debemos aplicar el corte inteligente con el servicio mejorado
         if check_intent and hasattr(state, 'session_start_time') and hasattr(state, 'intent_detection_timeout'):
-            should_continue, end_reason = self.intent_analysis_service.should_continue_conversation(
+            should_continue, end_reason = self.enhanced_intent_service.should_continue_conversation(
                 messages=state.get_formatted_message_history(),
                 session_start_time=state.session_start_time,
                 intent_detection_timeout=state.intent_detection_timeout
@@ -271,37 +303,73 @@ class ConversationService:
         )
         
         state.updated_at = datetime.now()
-        await self._save_conversation_state(state)
-        
         logger.info(f"Mensaje procesado para conversación {state.id}. Respuesta: {response_text[:100]}...")
         return state, audio_stream
     
-    async def end_conversation(self, conversation_id: str) -> ConversationState:
+    async def end_conversation(self, conversation_id: str, end_reason: str = "completed") -> ConversationState:
         """
         Finalizar una conversación.
         
         Args:
             conversation_id (str): ID de la conversación
+            end_reason (str): Razón de finalización
             
         Returns:
-            ConversationState: Estado final de la conversación
+            ConversationState: Estado actualizado de la conversación
         """
         state = await self._get_conversation_state(conversation_id)
         if not state:
             logger.error(f"No se encontró conversación con ID {conversation_id}")
             raise ValueError(f"No se encontró conversación con ID {conversation_id}")
         
-        # Actualizar estado de la sesión si existe
-        if hasattr(state, 'session_id'):
-            try:
-                await self.qualification_service.update_session_status(
-                    session_id=state.session_id,
-                    status='completed',
-                    end_reason='user_ended'
-                )
-                logger.info(f"Estado de sesión {state.session_id} actualizado a 'completed'")
-            except Exception as e:
-                logger.error(f"Error al actualizar estado de sesión: {e}")
+        state.status = "ended"
+        state.end_reason = end_reason
+        state.ended_at = datetime.now()
+        
+        # Determinar si hubo conversión basado en la razón de finalización
+        conversion_result = False
+        if end_reason in ["completed", "high_intent", "scheduled_demo", "purchase"]:
+            conversion_result = True
+        
+        # Actualizar el modelo de intención con los resultados de esta conversación
+        try:
+            await self.enhanced_intent_service.update_model_from_conversation(
+                conversation_id=conversation_id,
+                messages=state.get_formatted_message_history(),
+                conversion_result=conversion_result
+            )
+            logger.info(f"Modelo de intención actualizado con resultados de conversación {conversation_id}")
+            
+            # Guardar datos de entrenamiento para aprendizaje continuo
+            user_messages = [msg["content"] for msg in state.get_formatted_message_history() if msg["role"] == "user"]
+            
+            # Determinar etiqueta de intención
+            intent_label = "low_intent"
+            if hasattr(state, 'intent_analysis_results'):
+                intent_prob = state.intent_analysis_results.get("purchase_intent_probability", 0)
+                if intent_prob > 0.7:
+                    intent_label = "high_intent"
+                elif intent_prob > 0.4:
+                    intent_label = "medium_intent"
+                elif state.intent_analysis_results.get("has_rejection", False):
+                    intent_label = "rejection"
+            
+            # Guardar cada mensaje del usuario como dato de entrenamiento
+            for msg in user_messages[-3:]:  # Usar los últimos 3 mensajes
+                training_data = {
+                    "conversation_id": conversation_id,
+                    "user_message": msg,
+                    "intent_label": intent_label,
+                    "industry": self.enhanced_intent_service.industry,
+                    "keywords_detected": json.dumps(state.intent_analysis_results.get("intent_indicators", [])),
+                    "sentiment_score": state.intent_analysis_results.get("sentiment_score", 0),
+                    "conversion_result": conversion_result
+                }
+                
+                supabase_client.table("intent_training_data").insert(training_data).execute()
+            
+        except Exception as e:
+            logger.error(f"Error al actualizar modelo de intención: {e}")
         
         # Verificar si el último mensaje ya es una despedida
         last_assistant_message_content = None
