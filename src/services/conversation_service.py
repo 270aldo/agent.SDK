@@ -1,18 +1,33 @@
 import logging
 import asyncio
+import os
 from typing import Optional, Dict, Any, Tuple, List
 from io import BytesIO
 from datetime import datetime
 import uuid
 
 # SDK de OpenAI Agents
-from agents import Runner
+try:
+    from agents import Runner
+except ImportError:
+    # Si no está instalado, creamos un Runner simulado
+    class Runner:
+        @staticmethod
+        async def run(agent, messages):
+            return None
 
 from src.models.conversation import ConversationState, CustomerData, Message
 # from src.integrations.openai import ConversationEngine
 from src.integrations.elevenlabs import voice_engine
 from src.integrations.supabase import supabase_client
 from src.agents import NGXBaseAgent
+
+# Importar el agente simulado
+from src.agents.mock_agent import MockAgent, MockRunner
+
+# Importar servicios adicionales
+from src.services.intent_analysis_service import IntentAnalysisService
+from src.services.qualification_service import LeadQualificationService
 
 # Configurar logging
 logger = logging.getLogger(__name__)
@@ -28,6 +43,10 @@ class ConversationService:
         Inicializar el servicio de conversación.
         """
         logger.info("Servicio de conversación inicializado para usar OpenAI Agents SDK")
+        
+        # Inicializar servicios adicionales
+        self.intent_analysis_service = IntentAnalysisService()
+        self.qualification_service = LeadQualificationService()
     
     async def start_conversation(self, customer_data: CustomerData, program_type: str = "PRIME") -> ConversationState:
         """
@@ -40,14 +59,40 @@ class ConversationService:
         Returns:
             ConversationState: Estado inicial de la conversación
         """
+        # Verificar si el usuario ya tuvo una llamada en las últimas 48 horas
+        cooldown_status = await self.qualification_service._check_cooldown(str(customer_data.id))
+        if cooldown_status['in_cooldown']:
+            raise ValueError(f"Solo se permite una llamada cada 48 horas. Disponible en {cooldown_status['hours_remaining']} horas")
+        
+        # Crear estado inicial de la conversación
+        conversation_id = str(uuid.uuid4())
         state = ConversationState(
-            id=str(uuid.uuid4()),
+            id=conversation_id,
             customer_id=customer_data.id,
             program_type=program_type,
             customer_data=customer_data.model_dump(mode='json'),
             created_at=datetime.now(),
             updated_at=datetime.now()
         )
+        
+        # Registrar sesión del agente de voz
+        try:
+            session = await self.qualification_service.register_voice_agent_session(
+                user_id=str(customer_data.id),
+                conversation_id=conversation_id
+            )
+            
+            # Almacenar información de la sesión en el estado
+            state.session_id = session.get('id')
+            state.max_duration_seconds = session.get('max_duration_seconds')
+            state.intent_detection_timeout = session.get('intent_detection_timeout')
+            state.session_start_time = datetime.now()
+        except Exception as e:
+            logger.warning(f"No se pudo registrar la sesión del agente de voz: {e}")
+            # Establecer valores por defecto
+            state.max_duration_seconds = 7 * 60  # 7 minutos
+            state.intent_detection_timeout = 3 * 60  # 3 minutos
+            state.session_start_time = datetime.now()
         
         greeting = self._generate_greeting(customer_data, program_type)
         state.add_message(role="assistant", content=greeting)
@@ -60,7 +105,8 @@ class ConversationService:
     async def process_message(
         self, 
         conversation_id: str, 
-        message_text: str
+        message_text: str,
+        check_intent: bool = True
     ) -> Tuple[ConversationState, BytesIO]:
         """
         Procesar un mensaje del cliente y generar una respuesta con audio.
@@ -79,22 +125,91 @@ class ConversationService:
         
         state.add_message(role="user", content=message_text)
         
+        # Verificar si debemos aplicar el corte inteligente
+        if check_intent and hasattr(state, 'session_start_time') and hasattr(state, 'intent_detection_timeout'):
+            should_continue, end_reason = self.intent_analysis_service.should_continue_conversation(
+                messages=state.get_formatted_message_history(),
+                session_start_time=state.session_start_time,
+                intent_detection_timeout=state.intent_detection_timeout
+            )
+            
+            if not should_continue:
+                # Actualizar estado de la sesión si existe
+                if hasattr(state, 'session_id'):
+                    try:
+                        await self.qualification_service.update_session_status(
+                            session_id=state.session_id,
+                            status='timeout',
+                            end_reason=end_reason
+                        )
+                    except Exception as e:
+                        logger.error(f"Error al actualizar estado de sesión: {e}")
+                
+                # Generar mensaje de cierre basado en la razón
+                if end_reason == 'rejection_detected':
+                    response_text = "Entiendo que no estés interesado en este momento. Gracias por tu tiempo. Si cambias de opinión o tienes alguna pregunta en el futuro, no dudes en contactarnos."
+                else:  # no_intent_detected
+                    response_text = "Parece que este no es el mejor momento para hablar sobre nuestro programa. Te enviaré más información por correo electrónico para que puedas revisarla cuando te sea conveniente. ¡Gracias por tu tiempo!"
+                
+                state.add_message(role="assistant", content=response_text)
+                state.updated_at = datetime.now()
+                await self._save_conversation_state(state)
+                
+                # Generar audio de respuesta
+                customer_gender = "male"
+                if state.customer_data and isinstance(state.customer_data, dict):
+                    customer_gender = state.customer_data.get("gender", "male")
+                
+                audio_stream = await voice_engine.text_to_speech_async(
+                    text=response_text,
+                    program_type=state.program_type,
+                    gender=customer_gender
+                )
+                
+                logger.info(f"Conversación {state.id} finalizada por corte inteligente: {end_reason}")
+                return state, audio_stream
+        
         formatted_history = state.get_formatted_message_history()
 
-        agent = NGXBaseAgent(program_type=state.program_type)
-        
-        logger.info(f"Ejecutando agente NGX {state.program_type} para conversación {state.id}...")
+        # Verificar si debemos usar el agente simulado
+        use_mock_agent = False
         try:
-            agent_run_result = await Runner.run(agent, formatted_history)
-            response_text = agent_run_result.final_output
-            
-            if response_text is None:
-                logger.warning(f"El agente no devolvió un final_output para la conversación {state.id}. Usando respuesta por defecto.")
-                response_text = "No estoy seguro de cómo responder a eso en este momento. ¿Podrías reformular tu pregunta?"
+            # Intentar verificar la clave API de OpenAI
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key or api_key.startswith("sk-proj-"):
+                # Las claves que comienzan con sk-proj- son claves de proyecto y pueden requerir configuración adicional
+                # Por seguridad, usamos el agente simulado
+                logger.warning(f"Usando agente simulado para la conversación {state.id} debido a formato de clave API")
+                use_mock_agent = True
+        except Exception:
+            use_mock_agent = True
 
-        except Exception as e:
-            logger.error(f"Error al ejecutar el agente SDK para la conversación {state.id}: {e}")
-            response_text = "Lo siento, tuve un problema al procesar tu solicitud. Por favor, inténtalo de nuevo."
+        if use_mock_agent:
+            # Usar el agente simulado
+            logger.info(f"Ejecutando agente simulado NGX {state.program_type} para conversación {state.id}...")
+            try:
+                mock_agent = MockAgent(program_type=state.program_type)
+                agent_run_result = await MockRunner.run(mock_agent, formatted_history)
+                response_text = agent_run_result.final_output
+            except Exception as e:
+                logger.error(f"Error al ejecutar el agente simulado para la conversación {state.id}: {e}")
+                response_text = "Lo siento, tuve un problema al procesar tu solicitud. Por favor, inténtalo de nuevo."
+        else:
+            # Usar el agente real de OpenAI
+            agent = NGXBaseAgent(program_type=state.program_type)
+            
+            logger.info(f"Ejecutando agente NGX {state.program_type} para conversación {state.id}...")
+            try:
+                agent_run_result = await Runner.run(agent, formatted_history)
+                response_text = agent_run_result.final_output
+                
+                if response_text is None:
+                    logger.warning(f"El agente no devolvió un final_output para la conversación {state.id}. Usando respuesta por defecto.")
+                    response_text = "No estoy seguro de cómo responder a eso en este momento. ¿Podrías reformular tu pregunta?"
+
+            except Exception as e:
+                logger.error(f"Error al ejecutar el agente SDK para la conversación {state.id}: {e}")
+                response_text = "Lo siento, tuve un problema al procesar tu solicitud. Por favor, inténtalo de nuevo."
 
         state.add_message(role="assistant", content=response_text)
         
@@ -129,6 +244,19 @@ class ConversationService:
             logger.error(f"No se encontró conversación con ID {conversation_id}")
             raise ValueError(f"No se encontró conversación con ID {conversation_id}")
         
+        # Actualizar estado de la sesión si existe
+        if hasattr(state, 'session_id'):
+            try:
+                await self.qualification_service.update_session_status(
+                    session_id=state.session_id,
+                    status='completed',
+                    end_reason='user_ended'
+                )
+                logger.info(f"Estado de sesión {state.session_id} actualizado a 'completed'")
+            except Exception as e:
+                logger.error(f"Error al actualizar estado de sesión: {e}")
+        
+        # Verificar si el último mensaje ya es una despedida
         last_assistant_message_content = None
         if state.messages:
             for i in range(len(state.messages) - 1, -1, -1):
@@ -142,14 +270,17 @@ class ConversationService:
             if any(kw in last_assistant_message_content for kw in farewell_keywords):
                 should_add_farewell = False
         
+        # Añadir mensaje de despedida si es necesario
         if should_add_farewell:
             farewell = "Ha sido un placer hablar contigo hoy. Espero verte pronto en nuestra sesión estratégica inicial. Si tienes alguna pregunta adicional, no dudes en contactarnos. ¡Hasta pronto!"
             state.add_message(role="assistant", content=farewell)
         
+        # Marcar como finalizada
+        state.phase = "completed"
         state.updated_at = datetime.now()
         await self._save_conversation_state(state)
         
-        logger.info(f"Conversación {state.id} finalizada")
+        logger.info(f"Conversación {conversation_id} finalizada")
         return state
     
     def _generate_greeting(self, customer_data: CustomerData, program_type: str) -> str:

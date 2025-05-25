@@ -43,12 +43,19 @@ class ConversationState(BaseModel):
         "presentation", 
         "objection_handling", 
         "closing", 
-        "follow_up"
+        "follow_up",
+        "completed"
     ] = "greeting"
     messages: List[Message] = Field(default_factory=list)
     customer_data: Dict[str, Any] = Field(default_factory=dict)
     session_insights: Dict[str, Any] = Field(default_factory=dict)
     objections_raised: List[str] = Field(default_factory=list)
+    
+    # Campos para la sesión del agente de voz
+    session_id: Optional[str] = None
+    session_start_time: Optional[datetime] = None
+    max_duration_seconds: Optional[int] = None
+    intent_detection_timeout: Optional[int] = None
     next_steps_agreed: bool = False
     call_duration_seconds: int = 0
     created_at: datetime = Field(default_factory=datetime.now)
