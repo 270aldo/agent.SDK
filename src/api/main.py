@@ -5,6 +5,8 @@ import logging
 from dotenv import load_dotenv
 from .routers import conversation
 from .routers import qualification
+from .routers import analytics
+from .routers import predictive
 
 # Cargar variables de entorno
 load_dotenv()
@@ -35,6 +37,8 @@ app.add_middleware(
 # Incluir routers
 app.include_router(conversation.router)
 app.include_router(qualification.router)
+app.include_router(analytics.router)
+app.include_router(predictive.router)
 
 @app.get("/health")
 async def health_check():
