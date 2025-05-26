@@ -10,18 +10,21 @@ from typing import Dict, List, Any, Optional, Tuple, Set
 import logging
 import json
 import uuid
+import asyncio
 from datetime import datetime
 import random
 
 from src.integrations.supabase.resilient_client import ResilientSupabaseClient
+from src.services.base_predictive_service import BasePredictiveService
 from src.services.predictive_model_service import PredictiveModelService
+from src.services.nlp_integration_service import NLPIntegrationService
 from src.services.objection_prediction_service import ObjectionPredictionService
 from src.services.needs_prediction_service import NeedsPredictionService
 from src.services.conversion_prediction_service import ConversionPredictionService
 
 logger = logging.getLogger(__name__)
 
-class DecisionEngineService:
+class DecisionEngineService(BasePredictiveService):
     """
     Servicio para optimizar el flujo de conversación y toma de decisiones.
     
@@ -35,6 +38,7 @@ class DecisionEngineService:
     def __init__(self, 
                  supabase_client: ResilientSupabaseClient,
                  predictive_model_service: PredictiveModelService,
+                 nlp_integration_service: NLPIntegrationService,
                  objection_prediction_service: ObjectionPredictionService,
                  needs_prediction_service: NeedsPredictionService,
                  conversion_prediction_service: ConversionPredictionService):
@@ -44,51 +48,44 @@ class DecisionEngineService:
         Args:
             supabase_client: Cliente de Supabase para persistencia
             predictive_model_service: Servicio base para modelos predictivos
+            nlp_integration_service: Servicio de integración NLP
             objection_prediction_service: Servicio de predicción de objeciones
             needs_prediction_service: Servicio de predicción de necesidades
             conversion_prediction_service: Servicio de predicción de conversión
         """
-        self.supabase = supabase_client
-        self.predictive_model_service = predictive_model_service
+        super().__init__(
+            supabase_client=supabase_client,
+            predictive_model_service=predictive_model_service,
+            nlp_integration_service=nlp_integration_service,
+            model_name="decision_engine_model",
+            model_type="decision_engine"
+        )
         self.objection_service = objection_prediction_service
         self.needs_service = needs_prediction_service
         self.conversion_service = conversion_prediction_service
-        self.model_name = "decision_engine_model"
         self._initialize_model()
         
     async def _initialize_model(self) -> None:
         """
         Inicializa el modelo del motor de decisiones.
         """
-        try:
-            # Verificar si el modelo ya existe
-            model = await self.predictive_model_service.get_model(self.model_name)
-            
-            if not model:
-                # Crear modelo si no existe
-                model_params = {
-                    "objective_weights": {
-                        "need_satisfaction": 0.35,
-                        "objection_handling": 0.25,
-                        "conversion_progress": 0.4
-                    },
-                    "exploration_rate": 0.2,  # Tasa de exploración para nuevas rutas
-                    "adaptation_threshold": 0.3,  # Umbral para adaptación de estrategia
-                    "max_tree_depth": 5,  # Profundidad máxima de árboles de decisión
-                    "min_confidence": 0.6,  # Confianza mínima para tomar decisiones
-                    "context_window": 15  # Número de mensajes a considerar para contexto
-                }
-                
-                await self.predictive_model_service.register_model(
-                    model_name=self.model_name,
-                    model_type="decision_engine",
-                    model_params=model_params,
-                    description="Modelo para motor de decisiones y optimización de flujo"
-                )
-                logger.info(f"Modelo de motor de decisiones inicializado: {self.model_name}")
-            
-        except Exception as e:
-            logger.error(f"Error al inicializar modelo de motor de decisiones: {e}")
+        model_params = {
+            "objective_weights": {
+                "need_satisfaction": 0.35,
+                "objection_handling": 0.25,
+                "conversion_progress": 0.4
+            },
+            "exploration_rate": 0.2,  # Tasa de exploración para nuevas rutas
+            "adaptation_threshold": 0.3,  # Umbral para adaptación de estrategia
+            "max_tree_depth": 5,  # Profundidad máxima de árboles de decisión
+            "min_confidence": 0.6,  # Confianza mínima para tomar decisiones
+            "context_window": 15  # Número de mensajes a considerar para contexto
+        }
+        
+        await self.initialize_model(
+            model_params=model_params,
+            description="Modelo para motor de decisiones y optimización de flujo"
+        )
     
     async def optimize_conversation_flow(self, conversation_id: str, 
                                    messages: List[Dict[str, Any]],
@@ -104,98 +101,95 @@ class DecisionEngineService:
             current_objectives: Objetivos actuales con pesos (opcional)
             
         Returns:
-            Recomendaciones de flujo optimizado
+            Estrategia optimizada con acciones recomendadas
         """
         try:
             if not messages:
                 return {
                     "next_actions": [],
-                    "decision_tree": {},
-                    "objectives": {},
-                    "confidence": 0
+                    "confidence": 0,
+                    "decision_tree": {}
                 }
             
             # Obtener parámetros del modelo
-            model = await self.predictive_model_service.get_model(self.model_name)
-            if not model or "parameters" not in model:
-                logger.error("Modelo de motor de decisiones no encontrado")
-                return {
-                    "next_actions": [],
-                    "decision_tree": {},
-                    "objectives": {},
-                    "confidence": 0
-                }
-            
-            model_params = json.loads(model["parameters"])
-            default_objective_weights = model_params.get("objective_weights", {})
+            model_params = await self.get_model_parameters()
             min_confidence = model_params.get("min_confidence", 0.6)
-            context_window = model_params.get("context_window", 15)
             
-            # Usar objetivos proporcionados o los predeterminados
-            objective_weights = current_objectives or default_objective_weights
+            # Obtener objetivos predeterminados si no se proporcionan
+            objective_weights = current_objectives or model_params.get("objective_weights", {
+                "need_satisfaction": 0.35,
+                "objection_handling": 0.25,
+                "conversion_progress": 0.4
+            })
             
-            # Limitar a los últimos N mensajes para el análisis
-            recent_messages = messages[-context_window:] if len(messages) > context_window else messages
-            
-            # Obtener predicciones de los diferentes modelos
-            objection_prediction = await self.objection_service.predict_objections(
-                conversation_id, recent_messages, customer_profile
+            # Obtener predicciones de otros servicios en paralelo para mejorar rendimiento
+            objection_task = self.objection_service.predict_objections(
+                conversation_id=conversation_id,
+                messages=messages,
+                customer_profile=customer_profile
             )
             
-            needs_prediction = await self.needs_service.predict_needs(
-                conversation_id, recent_messages, customer_profile
+            needs_task = self.needs_service.predict_needs(
+                conversation_id=conversation_id,
+                messages=messages,
+                customer_profile=customer_profile
             )
             
-            conversion_prediction = await self.conversion_service.predict_conversion(
-                conversation_id, recent_messages, customer_profile
+            conversion_task = self.conversion_service.predict_conversion(
+                conversation_id=conversation_id,
+                messages=messages,
+                customer_profile=customer_profile
+            )
+            
+            # Esperar a que todas las predicciones se completen
+            objection_prediction, needs_prediction, conversion_prediction = await asyncio.gather(
+                objection_task, needs_task, conversion_task
             )
             
             # Generar árbol de decisión
             decision_tree = await self._generate_decision_tree(
-                objection_prediction,
-                needs_prediction,
-                conversion_prediction,
-                objective_weights,
-                customer_profile
+                objection_prediction=objection_prediction,
+                needs_prediction=needs_prediction,
+                conversion_prediction=conversion_prediction,
+                objective_weights=objective_weights,
+                customer_profile=customer_profile
             )
             
-            # Determinar próximas acciones óptimas
-            next_actions, confidence = await self._determine_next_actions(
-                decision_tree,
-                objective_weights,
-                min_confidence
+            # Determinar próximas acciones
+            next_actions = await self._determine_next_actions(
+                decision_tree=decision_tree,
+                objective_weights=objective_weights,
+                min_confidence=min_confidence
             )
             
-            # Almacenar decisión
-            decision_data = {
-                "decision_tree": decision_tree,
+            # Calcular confianza general
+            confidence = sum([action.get("confidence", 0) for action in next_actions]) / max(1, len(next_actions))
+            
+            # Crear resultado de optimización
+            optimization_result = {
                 "next_actions": next_actions,
-                "objectives": objective_weights,
-                "confidence": confidence
+                "confidence": confidence,
+                "decision_tree": decision_tree,
+                "timestamp": datetime.now().isoformat()
             }
             
-            await self.predictive_model_service.store_prediction(
-                model_name=self.model_name,
+            # Guardar predicción en base de datos usando la clase base
+            await self.store_prediction(
                 conversation_id=conversation_id,
-                prediction_type="decision",
-                prediction_data=decision_data,
+                prediction_type="flow_optimization",
+                prediction_data=optimization_result,
                 confidence=confidence
             )
             
-            return {
-                "next_actions": next_actions,
-                "decision_tree": decision_tree,
-                "objectives": objective_weights,
-                "confidence": confidence
-            }
+            return optimization_result
             
         except Exception as e:
             logger.error(f"Error al optimizar flujo de conversación: {e}")
             return {
                 "next_actions": [],
+                "confidence": 0,
                 "decision_tree": {},
-                "objectives": {},
-                "confidence": 0
+                "error": str(e)
             }
     
     async def _generate_decision_tree(self, 
@@ -406,7 +400,7 @@ class DecisionEngineService:
     
     async def _determine_next_actions(self, decision_tree: Dict[str, Any],
                                 objective_weights: Dict[str, float],
-                                min_confidence: float) -> Tuple[List[Dict[str, Any]], float]:
+                                min_confidence: float) -> List[Dict[str, Any]]:
         """
         Determina las próximas acciones óptimas basadas en el árbol de decisión.
         
@@ -416,55 +410,80 @@ class DecisionEngineService:
             min_confidence: Confianza mínima para tomar decisiones
             
         Returns:
-            Tupla con lista de acciones recomendadas y nivel de confianza
+            Lista de acciones recomendadas
         """
-        next_actions = []
-        
-        # Extraer todos los nodos de acción del árbol
-        action_nodes = self._extract_action_nodes(decision_tree)
-        
-        # Ordenar por puntuación
-        action_nodes.sort(key=lambda x: x.get("score", 0), reverse=True)
-        
-        # Seleccionar las mejores acciones (máximo 3)
-        top_actions = action_nodes[:3]
-        
-        # Convertir nodos a formato de acción
-        for node in top_actions:
-            action = {
-                "id": node.get("id", str(uuid.uuid4())),
-                "type": node.get("type", ""),
-                "description": node.get("description", ""),
-                "content": node.get("content", node.get("description", "")),
-                "score": node.get("score", 0),
-                "priority": node.get("priority", "medium")
-            }
+        try:
+            # Extraer todos los nodos de acción del árbol
+            action_nodes = await self._extract_action_nodes(decision_tree)
             
-            # Añadir datos específicos según tipo
-            if node.get("type") == "response":
-                action["action_category"] = "objection_response"
-            elif node.get("type") == "action":
-                action["action_category"] = "need_satisfaction"
-                action["action_type"] = node.get("action_type", "")
-            elif node.get("type") == "recommendation":
-                action["action_category"] = "conversion_progression"
-                action["recommendation_type"] = node.get("recommendation_type", "")
-            elif node.get("type") == "exploration_action":
-                action["action_category"] = "exploration"
+            if not action_nodes:
+                return []
             
-            next_actions.append(action)
-        
-        # Calcular confianza general como promedio ponderado de puntuaciones
-        confidence = sum(action.get("score", 0) for action in next_actions) / len(next_actions) if next_actions else 0
-        
-        # Si la confianza es muy baja, añadir una acción de exploración
-        if confidence < min_confidence and not any(a.get("action_category") == "exploration" for a in next_actions):
-            exploration_actions = [
-                "Preguntar sobre objetivos específicos del cliente",
-                "Indagar sobre el proceso de toma de decisiones",
-                "Explorar desafíos actuales que enfrenta el cliente",
-                "Preguntar sobre experiencias previas con soluciones similares"
-            ]
+            # Filtrar acciones por confianza mínima
+            filtered_actions = [node for node in action_nodes if node.get("confidence", 0) >= min_confidence]
+            
+            if not filtered_actions:
+                # Si no hay acciones con confianza suficiente, tomar las mejores 3
+                sorted_actions = sorted(action_nodes, key=lambda x: x.get("score", 0), reverse=True)
+                filtered_actions = sorted_actions[:3]
+                
+                # Si aún así no hay acciones, añadir acciones de exploración
+                if not filtered_actions:
+                    exploration_actions = [
+                        {
+                            "type": "exploration",
+                            "action": "explore_needs",
+                            "description": "Preguntar sobre objetivos específicos del cliente",
+                            "priority": "high",
+                            "confidence": 0.7,
+                            "score": 0.7,
+                            "related_to": {"objective": "need_satisfaction"}
+                        },
+                        {
+                            "type": "exploration",
+                            "action": "explore_decision_process",
+                            "description": "Indagar sobre el proceso de toma de decisiones",
+                            "priority": "medium",
+                            "confidence": 0.6,
+                            "score": 0.6,
+                            "related_to": {"objective": "conversion_progress"}
+                        },
+                        {
+                            "type": "exploration",
+                            "action": "explore_challenges",
+                            "description": "Explorar desafíos actuales que enfrenta el cliente",
+                            "priority": "medium",
+                            "confidence": 0.6,
+                            "score": 0.6,
+                            "related_to": {"objective": "objection_handling"}
+                        }
+                    ]
+                    return exploration_actions
+            
+            # Ordenar por puntuación
+            sorted_actions = sorted(filtered_actions, key=lambda x: x.get("score", 0), reverse=True)
+            
+            # Limitar a las 5 mejores acciones
+            top_actions = sorted_actions[:5]
+            
+            # Preparar resultado
+            result = []
+            for action in top_actions:
+                result.append({
+                    "type": action.get("type", ""),
+                    "action": action.get("action", ""),
+                    "description": action.get("description", ""),
+                    "priority": action.get("priority", "medium"),
+                    "confidence": action.get("confidence", 0),
+                    "score": action.get("score", 0),
+                    "related_to": action.get("related_to", {})
+                })
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error al determinar próximas acciones: {e}")
+            return []
             
             random_action = random.choice(exploration_actions)
             
@@ -480,7 +499,7 @@ class DecisionEngineService:
         
         return next_actions, confidence
     
-    def _extract_action_nodes(self, node: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _extract_action_nodes(self, node: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Extrae todos los nodos de acción de un árbol de decisión.
         
@@ -490,142 +509,324 @@ class DecisionEngineService:
         Returns:
             Lista de nodos de acción
         """
-        action_nodes = []
-        action_types = {"response", "action", "recommendation", "exploration_action"}
-        
-        # Si el nodo actual es un nodo de acción, añadirlo
-        if node.get("type") in action_types:
-            action_nodes.append(node)
-        
-        # Recursivamente procesar hijos
-        if "children" in node and node["children"]:
-            for child in node["children"]:
-                action_nodes.extend(self._extract_action_nodes(child))
-        
-        return action_nodes
+        try:
+            action_nodes = []
+            
+            # Si el nodo actual es un nodo de acción, añadirlo
+            if node.get("type") in ["action", "response", "recommendation", "exploration"]:
+                action_nodes.append(node)
+            
+            # Procesar nodos hijos recursivamente
+            children = node.get("children", [])
+            for child in children:
+                child_nodes = await self._extract_action_nodes(child)
+                action_nodes.extend(child_nodes)
+            
+            return action_nodes
+        except Exception as e:
+            logger.error(f"Error al extraer nodos de acción: {e}")
+            return []
     
-    async def adapt_strategy_realtime(self, conversation_id: str,
-                                messages: List[Dict[str, Any]],
-                                current_strategy: Dict[str, Any],
-                                feedback: Optional[Dict[str, Any]] = None,
-                                customer_profile: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def adapt_strategy_realtime(self, conversation_id: str, 
+                                  messages: List[Dict[str, Any]],
+                                  feedback: Dict[str, Any],
+                                  customer_profile: Optional[Dict[str, Any]] = None,
+                                  current_objectives: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
         """
-        Adapta la estrategia de conversación en tiempo real basado en feedback y nuevos mensajes.
+        Adapta la estrategia en tiempo real basándose en feedback del usuario.
         
         Args:
             conversation_id: ID de la conversación
             messages: Lista de mensajes de la conversación
-            current_strategy: Estrategia actual (árbol de decisión y acciones)
-            feedback: Feedback sobre acciones previas (opcional)
+            feedback: Feedback del usuario sobre la conversación
             customer_profile: Perfil del cliente (opcional)
+            current_objectives: Objetivos actuales (opcional)
             
         Returns:
-            Estrategia adaptada con nuevas acciones recomendadas
+            Estrategia adaptada con nuevos objetivos y acciones recomendadas
         """
         try:
-            if not messages or not current_strategy:
-                return await self.optimize_conversation_flow(conversation_id, messages, customer_profile)
+            if not messages or not feedback:
+                return {
+                    "adjusted_objectives": current_objectives or {},
+                    "next_actions": []
+                }
             
-            # Obtener parámetros del modelo
-            model = await self.predictive_model_service.get_model(self.model_name)
-            if not model or "parameters" not in model:
-                logger.error("Modelo de motor de decisiones no encontrado")
-                return current_strategy
+            # Extraer información del feedback
+            feedback_type = feedback.get("type", "")
+            feedback_value = feedback.get("value", 0)
+            feedback_details = feedback.get("details", {})
             
-            model_params = json.loads(model["parameters"])
-            adaptation_threshold = model_params.get("adaptation_threshold", 0.3)
-            exploration_rate = model_params.get("exploration_rate", 0.2)
+            # Inicializar objetivos si no se proporcionan
+            if not current_objectives:
+                current_objectives = {
+                    "conversion": 0.5,
+                    "satisfaction": 0.3,
+                    "efficiency": 0.2
+                }
             
-            # Evaluar necesidad de adaptación basado en feedback
-            adaptation_needed = False
-            objective_weights = current_strategy.get("objectives", {})
+            # Ajustar objetivos basados en feedback
+            adjusted_objectives = current_objectives.copy()
             
-            if feedback:
-                # Si hay feedback negativo, se necesita adaptación
-                if feedback.get("success", True) == False:
-                    adaptation_needed = True
-                    
-                    # Ajustar pesos de objetivos basado en feedback
-                    feedback_type = feedback.get("type", "")
-                    if feedback_type == "objection_not_addressed":
-                        objective_weights["objection_handling"] = min(1.0, objective_weights.get("objection_handling", 0.25) + 0.15)
-                    elif feedback_type == "need_not_satisfied":
-                        objective_weights["need_satisfaction"] = min(1.0, objective_weights.get("need_satisfaction", 0.35) + 0.15)
-                    elif feedback_type == "conversion_stalled":
-                        objective_weights["conversion_progress"] = min(1.0, objective_weights.get("conversion_progress", 0.4) + 0.15)
-                    
-                    # Normalizar pesos
-                    total_weight = sum(objective_weights.values())
-                    if total_weight > 0:
-                        for key in objective_weights:
-                            objective_weights[key] /= total_weight
+            if feedback_type == "satisfaction":
+                # Si el cliente está insatisfecho, aumentar prioridad de satisfacción
+                if feedback_value < 0.5:
+                    adjusted_objectives["satisfaction"] = min(1.0, adjusted_objectives.get("satisfaction", 0) + 0.2)
+                    adjusted_objectives["conversion"] = max(0.1, adjusted_objectives.get("conversion", 0) - 0.1)
+                
+            elif feedback_type == "objection":
+                # Si hay objeciones, enfocarse en abordarlas
+                objection_type = feedback_details.get("objection_type", "")
+                
+                # Obtener predicción de objeciones
+                objection_prediction = await self.objection_service.predict_objections(
+                    conversation_id=conversation_id,
+                    messages=messages,
+                    customer_profile=customer_profile
+                )
+                
+                # Buscar estrategias para la objeción específica
+                objections = objection_prediction.get("objections", [])
+                target_objection = None
+                
+                for obj in objections:
+                    if obj.get("type") == objection_type:
+                        target_objection = obj
+                        break
+                
+                # Ajustar objetivos para enfocarse en resolver la objeción
+                if target_objection:
+                    adjusted_objectives["objection_handling"] = 0.4
+                    adjusted_objectives["conversion"] = max(0.1, adjusted_objectives.get("conversion", 0) - 0.2)
+                    adjusted_objectives["efficiency"] = max(0.1, adjusted_objectives.get("efficiency", 0) - 0.1)
             
-            # Verificar si las últimas acciones tuvieron éxito
-            next_actions = current_strategy.get("next_actions", [])
-            if next_actions:
-                # Si la confianza es baja, considerar adaptación
-                avg_score = sum(action.get("score", 0) for action in next_actions) / len(next_actions)
-                if avg_score < adaptation_threshold:
-                    adaptation_needed = True
+            elif feedback_type == "interest":
+                # Si muestra interés en un producto/servicio específico
+                interest_category = feedback_details.get("category", "")
+                interest_level = feedback_value
+                
+                if interest_level > 0.7:
+                    # Alto interés, aumentar enfoque en conversión
+                    adjusted_objectives["conversion"] = min(1.0, adjusted_objectives.get("conversion", 0) + 0.2)
+                    adjusted_objectives["efficiency"] = max(0.1, adjusted_objectives.get("efficiency", 0) - 0.1)
             
-            # Si no se necesita adaptación, mantener estrategia actual
-            if not adaptation_needed:
-                return current_strategy
+            # Normalizar objetivos para que sumen 1.0
+            total = sum(adjusted_objectives.values())
+            if total > 0:
+                for key in adjusted_objectives:
+                    adjusted_objectives[key] = adjusted_objectives[key] / total
             
-            # Generar nueva estrategia con pesos ajustados
+            # Obtener nueva estrategia con objetivos ajustados
             new_strategy = await self.optimize_conversation_flow(
-                conversation_id, 
-                messages, 
-                customer_profile,
-                objective_weights
+                conversation_id=conversation_id,
+                messages=messages,
+                customer_profile=customer_profile,
+                current_objectives=adjusted_objectives
             )
             
-            # Aumentar tasa de exploración para descubrir nuevas rutas
-            decision_tree = new_strategy.get("decision_tree", {})
-            exploration_nodes = [node for node in self._extract_action_nodes(decision_tree) 
-                               if node.get("type") == "exploration_action"]
-            
-            for node in exploration_nodes:
-                node["score"] = min(1.0, node.get("score", 0.5) + exploration_rate)
-            
-            # Recalcular próximas acciones
-            next_actions, confidence = await self._determine_next_actions(
-                decision_tree,
-                objective_weights,
-                model_params.get("min_confidence", 0.6)
-            )
-            
-            new_strategy["next_actions"] = next_actions
-            new_strategy["confidence"] = confidence
-            new_strategy["adapted"] = True
-            
-            # Almacenar estrategia adaptada
+            # Registrar adaptación de estrategia usando la clase base
             adaptation_data = {
-                "original_strategy": current_strategy,
-                "adapted_strategy": new_strategy,
+                "conversation_id": conversation_id,
                 "feedback": feedback,
-                "adaptation_reason": "feedback_based" if feedback else "performance_based"
+                "previous_objectives": current_objectives,
+                "adjusted_objectives": adjusted_objectives,
+                "next_actions": new_strategy.get("next_actions", []),
+                "timestamp": datetime.now().isoformat()
             }
             
-            await self.predictive_model_service.store_prediction(
-                model_name=self.model_name,
+            # Usar el método de la clase base para almacenar la predicción
+            await self.store_prediction(
                 conversation_id=conversation_id,
                 prediction_type="strategy_adaptation",
                 prediction_data=adaptation_data,
-                confidence=confidence
+                confidence=0.7  # Confianza moderada en la adaptación
             )
             
-            return new_strategy
+            # Registrar el feedback para análisis posterior y mejora del modelo
+            await self.log_feedback(
+                conversation_id=conversation_id,
+                feedback_data={
+                    "type": feedback_type,
+                    "value": feedback_value,
+                    "details": feedback_details,
+                    "resulting_adaptation": adjusted_objectives
+                }
+            )
+            
+            return {
+                "adjusted_objectives": adjusted_objectives,
+                "next_actions": new_strategy.get("next_actions", [])
+            }
             
         except Exception as e:
             logger.error(f"Error al adaptar estrategia en tiempo real: {e}")
-            return current_strategy
+            return {
+                "adjusted_objectives": current_objectives or {},
+                "next_actions": []
+            }
+    
+    async def log_feedback(self, conversation_id: str, feedback_data: Dict[str, Any]) -> None:
+        """
+        Registra el feedback del usuario para análisis posterior y mejora del modelo.
+        
+        Args:
+            conversation_id: ID de la conversación
+            feedback_data: Datos del feedback recibido
+        """
+        try:
+            # Enriquecer los datos de feedback con información adicional
+            enriched_feedback = {
+                **feedback_data,
+                "timestamp": datetime.now().isoformat(),
+                "model_name": self.model_name,
+                "model_version": self.model_version
+            }
+            
+            # Almacenar el feedback en la base de datos usando el cliente de Supabase
+            await self.supabase_client.from_("feedback_logs")\
+                .insert({
+                    "conversation_id": conversation_id,
+                    "model_name": self.model_name,
+                    "feedback_type": feedback_data.get("type", "unknown"),
+                    "feedback_value": feedback_data.get("value", 0),
+                    "feedback_details": feedback_data.get("details", {}),
+                    "resulting_adaptation": feedback_data.get("resulting_adaptation", {}),
+                    "created_at": enriched_feedback["timestamp"]
+                })\
+                .execute()
+            
+            # Registrar el feedback en los logs para análisis
+            logger.info(f"Feedback registrado para conversación {conversation_id}: {feedback_data}")
+            
+            # Actualizar métricas de feedback para el modelo
+            await self._update_feedback_metrics(conversation_id, feedback_data)
+            
+        except Exception as e:
+            logger.error(f"Error al registrar feedback: {e}")
+    
+    async def _update_feedback_metrics(self, conversation_id: str, feedback_data: Dict[str, Any]) -> None:
+        """
+        Actualiza las métricas internas basadas en el feedback recibido.
+        
+        Args:
+            conversation_id: ID de la conversación
+            feedback_data: Datos del feedback recibido
+        """
+        try:
+            # Obtener métricas actuales del modelo
+            model_metrics = await self.get_model_metrics()
+            
+            # Actualizar métricas según el tipo de feedback
+            feedback_type = feedback_data.get("type", "")
+            feedback_value = feedback_data.get("value", 0)
+            
+            if feedback_type == "satisfaction":
+                # Actualizar promedio de satisfacción
+                current_avg = model_metrics.get("avg_satisfaction", 0)
+                current_count = model_metrics.get("satisfaction_count", 0)
+                
+                new_count = current_count + 1
+                new_avg = ((current_avg * current_count) + feedback_value) / new_count
+                
+                model_metrics["avg_satisfaction"] = new_avg
+                model_metrics["satisfaction_count"] = new_count
+                
+            elif feedback_type == "objection":
+                # Incrementar contador de objeciones por tipo
+                objection_type = feedback_data.get("details", {}).get("objection_type", "unknown")
+                objection_counts = model_metrics.get("objection_counts", {})
+                
+                objection_counts[objection_type] = objection_counts.get(objection_type, 0) + 1
+                model_metrics["objection_counts"] = objection_counts
+            
+            # Guardar métricas actualizadas
+            await self._save_model_metrics(model_metrics)
+            
+        except Exception as e:
+            logger.error(f"Error al actualizar métricas de feedback: {e}")
+    
+    async def _save_model_metrics(self, model_metrics: Dict[str, Any]) -> None:
+        """
+        Guarda las métricas actualizadas del modelo en la base de datos.
+        
+        Args:
+            model_metrics: Métricas actualizadas del modelo
+        """
+        try:
+            # Preparar datos para guardar
+            metrics_data = {
+                "model_name": self.model_name,
+                "model_version": self.model_version,
+                "metrics": model_metrics,
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            # Verificar si ya existen métricas para este modelo
+            result = await self.supabase_client.from_("model_metrics")\
+                .select("*")\
+                .eq("model_name", self.model_name)\
+                .eq("model_version", self.model_version)\
+                .execute()
+            
+            existing_metrics = result.data if hasattr(result, 'data') else []
+            
+            if existing_metrics:
+                # Actualizar métricas existentes
+                await self.supabase_client.from_("model_metrics")\
+                    .update({"metrics": model_metrics, "updated_at": metrics_data["updated_at"]})\
+                    .eq("model_name", self.model_name)\
+                    .eq("model_version", self.model_version)\
+                    .execute()
+            else:
+                # Insertar nuevas métricas
+                await self.supabase_client.from_("model_metrics")\
+                    .insert(metrics_data)\
+                    .execute()
+            
+            logger.info(f"Métricas guardadas para modelo {self.model_name} v{self.model_version}")
+            
+        except Exception as e:
+            logger.error(f"Error al guardar métricas del modelo: {e}")
+    
+    async def get_model_metrics(self) -> Dict[str, Any]:
+        """
+        Obtiene las métricas actuales del modelo desde la base de datos.
+        
+        Returns:
+            Métricas actuales del modelo
+        """
+        try:
+            # Obtener métricas de la base de datos
+            result = await self.supabase_client.from_("model_metrics")\
+                .select("*")\
+                .eq("model_name", self.model_name)\
+                .eq("model_version", self.model_version)\
+                .execute()
+            
+            metrics_data = result.data[0] if hasattr(result, 'data') and result.data else {}
+            
+            if metrics_data and "metrics" in metrics_data:
+                return metrics_data["metrics"]
+            else:
+                # Devolver métricas iniciales si no hay datos
+                return {
+                    "avg_satisfaction": 0,
+                    "satisfaction_count": 0,
+                    "objection_counts": {},
+                    "conversion_rate": 0,
+                    "conversion_count": 0,
+                    "total_predictions": 0
+                }
+            
+        except Exception as e:
+            logger.error(f"Error al obtener métricas del modelo: {e}")
+            return {}
     
     async def prioritize_objectives(self, conversation_id: str,
-                              messages: List[Dict[str, Any]],
-                              customer_profile: Optional[Dict[str, Any]] = None) -> Dict[str, float]:
+                               messages: List[Dict[str, Any]],
+                               customer_profile: Optional[Dict[str, Any]] = None) -> Dict[str, float]:
         """
-        Prioriza objetivos de conversación basado en el contexto actual.
+        Prioriza los objetivos del modelo según el contexto de la conversación.
         
         Args:
             conversation_id: ID de la conversación
@@ -636,13 +837,15 @@ class DecisionEngineService:
             Diccionario con objetivos priorizados y sus pesos
         """
         try:
-            # Obtener parámetros del modelo
-            model = await self.predictive_model_service.get_model(self.model_name)
-            if not model or "parameters" not in model:
-                logger.error("Modelo de motor de decisiones no encontrado")
-                return {}
-            
-            model_params = json.loads(model["parameters"])
+            # Obtener parámetros del modelo usando el método de la clase base
+            model_params = await self.get_model_parameters()
+            if not model_params:
+                default_weights = {
+                    "conversion": 0.4,
+                    "need_satisfaction": 0.35,
+                    "objection_handling": 0.25
+                }
+                return default_weights
             default_weights = model_params.get("objective_weights", {
                 "need_satisfaction": 0.35,
                 "objection_handling": 0.25,
@@ -695,29 +898,30 @@ class DecisionEngineService:
                 for key in objective_weights:
                     objective_weights[key] /= total_weight
             
-            # Almacenar priorización
-            prioritization_data = {
-                "objective_weights": objective_weights,
-                "objection_confidence": objection_prediction.get("confidence", 0),
-                "needs_confidence": needs_prediction.get("confidence", 0),
-                "conversion_category": conversion_category
-            }
-            
-            await self.predictive_model_service.store_prediction(
-                model_name=self.model_name,
+            # Almacenar priorización usando el método de la clase base
+            await self.store_prediction(
                 conversation_id=conversation_id,
-                prediction_type="objective_prioritization",
-                prediction_data=prioritization_data,
-                confidence=max(objection_prediction.get("confidence", 0),
-                              needs_prediction.get("confidence", 0),
-                              conversion_prediction.get("confidence", 0))
+                prediction_type="objectives_prioritization",
+                prediction_data={
+                    "objectives": objective_weights,
+                    "conversation_stage": self._determine_conversation_stage(messages),
+                    "objection_probability": objection_prediction.get("probability", 0),
+                    "conversion_probability": conversion_prediction.get("probability", 0),
+                    "unsatisfied_needs_count": len([need for need in needs if need.get("satisfaction_level", 0) <= 0.6]),
+                    "timestamp": datetime.now().isoformat()
+                },
+                confidence=0.8
             )
             
             return objective_weights
             
         except Exception as e:
             logger.error(f"Error al priorizar objetivos: {e}")
-            return default_weights
+            return {
+                "conversion": 0.4,
+                "need_satisfaction": 0.35,
+                "objection_handling": 0.25
+            }
     
     async def evaluate_conversation_path(self, conversation_id: str,
                                     messages: List[Dict[str, Any]],
@@ -729,11 +933,11 @@ class DecisionEngineService:
         Args:
             conversation_id: ID de la conversación
             messages: Lista de mensajes de la conversación
-            path_actions: Acciones tomadas en la ruta a evaluar
+            path_actions: Acciones tomadas en la ruta de conversación
             customer_profile: Perfil del cliente (opcional)
             
         Returns:
-            Evaluación de la ruta con métricas de efectividad
+            Evaluación de la ruta con métricas y recomendaciones
         """
         try:
             if not messages or not path_actions:
@@ -743,125 +947,137 @@ class DecisionEngineService:
                     "recommendations": []
                 }
             
-            # Obtener predicciones actuales
-            conversion_prediction = await self.conversion_service.predict_conversion(
-                conversation_id, messages, customer_profile
+            # Obtener predicciones actuales en paralelo para mejorar rendimiento
+            objection_task = self.objection_service.predict_objections(
+                conversation_id=conversation_id,
+                messages=messages,
+                customer_profile=customer_profile
             )
             
-            # Métricas a evaluar
-            metrics = {
-                "conversion_probability": conversion_prediction.get("probability", 0),
-                "objections_addressed": 0,
-                "needs_satisfied": 0,
-                "engagement_level": 0
-            }
+            needs_task = self.needs_service.predict_needs(
+                conversation_id=conversation_id,
+                messages=messages,
+                customer_profile=customer_profile
+            )
             
-            # Evaluar manejo de objeciones
-            objection_types_addressed = set()
+            conversion_task = self.conversion_service.predict_conversion(
+                conversation_id=conversation_id,
+                messages=messages,
+                customer_profile=customer_profile
+            )
+            
+            # Esperar a que todas las predicciones se completen
+            objection_prediction, needs_prediction, conversion_prediction = await asyncio.gather(
+                objection_task, needs_task, conversion_task
+            )
+            
+            # Calcular métricas de efectividad
+            metrics = {}
+            
+            # 1. Reducción de objeciones
+            objection_probability = objection_prediction.get("probability", 0)
+            metrics["objection_reduction"] = 1 - objection_probability
+            
+            # 2. Satisfacción de necesidades
+            needs = needs_prediction.get("needs", [])
+            satisfied_needs = [need for need in needs if need.get("satisfaction_level", 0) > 0.6]
+            needs_satisfaction = len(satisfied_needs) / max(1, len(needs))
+            metrics["needs_satisfaction"] = needs_satisfaction
+            
+            # 3. Progreso de conversión
+            conversion_probability = conversion_prediction.get("probability", 0)
+            metrics["conversion_progress"] = conversion_probability
+            
+            # 4. Alineación con acciones recomendadas
+            recommended_actions = set()
             for action in path_actions:
-                if action.get("action_category") == "objection_response":
-                    objection_types_addressed.add(action.get("objection_type", ""))
+                action_id = action.get("id", "")
+                action_type = action.get("type", "")
+                if action_id or action_type:
+                    recommended_actions.add(f"{action_type}:{action_id}")
             
-            # Obtener todas las objeciones detectadas
-            objection_prediction = await self.objection_service.predict_objections(
-                conversation_id, messages, customer_profile
+            # Obtener acciones que se deberían haber tomado según predicciones actuales
+            current_strategy = await self.optimize_conversation_flow(
+                conversation_id=conversation_id,
+                messages=messages,
+                customer_profile=customer_profile
             )
             
-            objection_types_detected = set(obj.get("type", "") for obj in objection_prediction.get("objections", []))
+            optimal_actions = set()
+            for action in current_strategy.get("next_actions", []):
+                action_id = action.get("id", "")
+                action_type = action.get("type", "")
+                if action_id or action_type:
+                    optimal_actions.add(f"{action_type}:{action_id}")
             
-            # Calcular proporción de objeciones abordadas
-            if objection_types_detected:
-                metrics["objections_addressed"] = len(objection_types_addressed.intersection(objection_types_detected)) / len(objection_types_detected)
+            # Calcular alineación como intersección de conjuntos
+            if optimal_actions:
+                alignment = len(recommended_actions.intersection(optimal_actions)) / len(optimal_actions)
             else:
-                metrics["objections_addressed"] = 1.0  # No había objeciones que abordar
+                alignment = 0
             
-            # Evaluar satisfacción de necesidades
-            need_categories_addressed = set()
-            for action in path_actions:
-                if action.get("action_category") == "need_satisfaction":
-                    need_categories_addressed.add(action.get("need_category", ""))
+            metrics["action_alignment"] = alignment
             
-            # Obtener todas las necesidades detectadas
-            needs_prediction = await self.needs_service.predict_needs(
-                conversation_id, messages, customer_profile
-            )
-            
-            need_categories_detected = set(need.get("category", "") for need in needs_prediction.get("needs", []))
-            
-            # Calcular proporción de necesidades satisfechas
-            if need_categories_detected:
-                metrics["needs_satisfied"] = len(need_categories_addressed.intersection(need_categories_detected)) / len(need_categories_detected)
-            else:
-                metrics["needs_satisfied"] = 1.0  # No había necesidades que satisfacer
-            
-            # Evaluar nivel de engagement
-            # Contar mensajes del cliente después de cada acción del agente
-            client_messages = [msg for msg in messages if msg.get("role") == "user"]
-            agent_messages = [msg for msg in messages if msg.get("role") == "assistant"]
-            
-            if agent_messages:
-                # Calcular promedio de longitud de respuestas del cliente
-                avg_client_length = sum(len(msg.get("content", "")) for msg in client_messages) / len(client_messages) if client_messages else 0
-                
-                # Normalizar (considerando 100 caracteres como buena longitud)
-                normalized_length = min(1.0, avg_client_length / 100)
-                
-                # Proporción de mensajes cliente/agente (idealmente cercano a 1)
-                message_ratio = min(1.0, len(client_messages) / len(agent_messages))
-                
-                metrics["engagement_level"] = (normalized_length + message_ratio) / 2
-            else:
-                metrics["engagement_level"] = 0
-            
-            # Calcular efectividad general como promedio ponderado de métricas
+            # Calcular efectividad general como promedio ponderado
             effectiveness = (
-                metrics["conversion_probability"] * 0.4 +
-                metrics["objections_addressed"] * 0.25 +
-                metrics["needs_satisfied"] * 0.25 +
-                metrics["engagement_level"] * 0.1
+                metrics["objection_reduction"] * 0.25 +
+                metrics["needs_satisfaction"] * 0.35 +
+                metrics["conversion_progress"] * 0.3 +
+                metrics["action_alignment"] * 0.1
             )
             
             # Generar recomendaciones para mejorar la ruta
             recommendations = []
             
-            if metrics["objections_addressed"] < 0.7:
-                recommendations.append({
-                    "type": "objection_handling",
-                    "description": "Mejorar el abordaje de objeciones detectadas",
-                    "priority": "high"
-                })
+            # Si hay baja reducción de objeciones
+            if metrics["objection_reduction"] < 0.5:
+                objections = objection_prediction.get("objections", [])
+                for objection in objections[:2]:  # Tomar las 2 principales objeciones
+                    recommendations.append({
+                        "type": "objection_handling",
+                        "description": f"Abordar objeción: {objection.get('description', '')}",
+                        "priority": "high"
+                    })
             
-            if metrics["needs_satisfied"] < 0.7:
-                recommendations.append({
-                    "type": "need_satisfaction",
-                    "description": "Profundizar en la satisfacción de necesidades identificadas",
-                    "priority": "high"
-                })
+            # Si hay baja satisfacción de necesidades
+            if metrics["needs_satisfaction"] < 0.5:
+                unsatisfied_needs = [need for need in needs if need.get("satisfaction_level", 0) <= 0.6]
+                for need in unsatisfied_needs[:2]:  # Tomar las 2 principales necesidades insatisfechas
+                    recommendations.append({
+                        "type": "need_satisfaction",
+                        "description": f"Satisfacer necesidad: {need.get('description', '')}",
+                        "priority": "high"
+                    })
             
-            if metrics["engagement_level"] < 0.5:
+            # Si hay bajo progreso de conversión
+            if metrics["conversion_progress"] < 0.4:
+                conversion_recommendations = conversion_prediction.get("recommendations", [])
+                for rec in conversion_recommendations[:2]:  # Tomar las 2 principales recomendaciones
+                    recommendations.append({
+                        "type": "conversion_progression",
+                        "description": rec.get("description", ""),
+                        "priority": "medium"
+                    })
+            
+            # Si hay baja alineación de acciones
+            if metrics["action_alignment"] < 0.5:
                 recommendations.append({
-                    "type": "engagement",
-                    "description": "Mejorar el nivel de engagement con preguntas más relevantes",
+                    "type": "action_alignment",
+                    "description": "Seguir más de cerca las acciones recomendadas por el motor de decisiones",
                     "priority": "medium"
                 })
             
-            if metrics["conversion_probability"] < 0.4:
-                recommendations.append({
-                    "type": "conversion",
-                    "description": "Implementar acciones específicas para avanzar en el proceso de conversión",
-                    "priority": "high"
-                })
-            
-            # Almacenar evaluación
+            # Guardar evaluación usando la clase base
             evaluation_data = {
+                "conversation_id": conversation_id,
                 "path_actions": path_actions,
                 "metrics": metrics,
                 "effectiveness": effectiveness,
-                "recommendations": recommendations
+                "recommendations": recommendations,
+                "timestamp": datetime.now().isoformat()
             }
             
-            await self.predictive_model_service.store_prediction(
-                model_name=self.model_name,
+            await self.store_prediction(
                 conversation_id=conversation_id,
                 prediction_type="path_evaluation",
                 prediction_data=evaluation_data,
@@ -882,6 +1098,48 @@ class DecisionEngineService:
                 "recommendations": []
             }
     
+    def _determine_conversation_stage(self, messages: List[Dict[str, Any]]) -> str:
+        """
+        Determina la etapa actual de la conversación basado en los mensajes.
+        
+        Args:
+            messages: Lista de mensajes de la conversación
+            
+        Returns:
+            Etapa de la conversación ("initial", "middle", "closing")
+        """
+        if not messages:
+            return "initial"
+        
+        # Determinar etapa basado en cantidad de mensajes
+        message_count = len(messages)
+        
+        if message_count <= 5:
+            return "initial"  # Etapa inicial (saludo, presentación)
+        elif message_count <= 15:
+            return "middle"   # Etapa media (exploración de necesidades, manejo de objeciones)
+        else:
+            # Analizar contenido de últimos mensajes para detectar si estamos en etapa de cierre
+            recent_messages = messages[-5:]  # Últimos 5 mensajes
+            closing_keywords = [
+                "comprar", "adquirir", "contratar", "precio", "costo", "pagar", "tarjeta",
+                "factura", "descuento", "oferta", "promocion", "cerrar", "finalizar", "decidir"
+            ]
+            
+            # Contar menciones de palabras clave de cierre
+            closing_mentions = 0
+            for msg in recent_messages:
+                content = msg.get("content", "").lower()
+                for keyword in closing_keywords:
+                    if keyword in content:
+                        closing_mentions += 1
+            
+            # Si hay suficientes menciones de palabras clave de cierre, considerar etapa de cierre
+            if closing_mentions >= 2:
+                return "closing"
+            else:
+                return "middle"
+    
     async def get_decision_statistics(self, time_period: Optional[int] = None) -> Dict[str, Any]:
         """
         Obtiene estadísticas sobre decisiones tomadas por el motor.
@@ -893,18 +1151,18 @@ class DecisionEngineService:
             Estadísticas de decisiones
         """
         try:
-            # Obtener precisión del modelo
-            accuracy_stats = await self.predictive_model_service.get_model_accuracy(
-                model_name=self.model_name,
-                time_period=time_period
-            )
+            # Obtener estadísticas básicas usando la clase base
+            basic_stats = await self.get_statistics(time_period)
             
             # Obtener todas las predicciones de decisión
-            query = self.supabase.table("prediction_results").select("*").eq("model_name", self.model_name).execute()
+            query = await self.supabase_client.from_("prediction_results")\
+                .select("*")\
+                .eq("model_name", self.model_name)\
+                .execute()
             
-            if not query.data:
+            if not hasattr(query, 'data') or not query.data:
                 return {
-                    "accuracy": accuracy_stats,
+                    **basic_stats,
                     "decision_types": {},
                     "adaptation_rate": 0,
                     "effectiveness": 0,
@@ -941,7 +1199,7 @@ class DecisionEngineService:
             avg_effectiveness = effectiveness_sum / effectiveness_count if effectiveness_count > 0 else 0
             
             return {
-                "accuracy": accuracy_stats,
+                **basic_stats,
                 "decision_types": decision_types,
                 "adaptation_rate": adaptation_rate,
                 "effectiveness": avg_effectiveness,
