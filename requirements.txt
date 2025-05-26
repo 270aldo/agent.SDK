@@ -1,11 +1,12 @@
 # API y Servidor
 fastapi==0.103.1
 uvicorn==0.23.2
-pydantic==2.4.2
+pydantic==2.10.0
 
 # OpenAI e IA
-openai
-openai-agents
+openai>=1.81.0
+openai-agents==0.0.12
+mcp==1.5.0
 langchain==0.0.312
 
 # Procesamiento de voz
@@ -20,7 +21,7 @@ asyncpg==0.28.0
 
 # Utilidades
 python-dotenv==1.0.0
-httpx==0.25.0
+httpx==0.27.0
 pyjwt==2.8.0
 tenacity==8.2.3
 

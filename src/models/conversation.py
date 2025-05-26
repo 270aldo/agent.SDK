@@ -56,6 +56,12 @@ class ConversationState(BaseModel):
     session_start_time: Optional[datetime] = None
     max_duration_seconds: Optional[int] = None
     intent_detection_timeout: Optional[int] = None
+    
+    # Campos para transferencia a agente humano
+    transfer_request_id: Optional[str] = None
+    transfer_status: Optional[str] = None
+    transfer_agent_id: Optional[str] = None
+    transfer_requested_at: Optional[datetime] = None
     next_steps_agreed: bool = False
     call_duration_seconds: int = 0
     created_at: datetime = Field(default_factory=datetime.now)

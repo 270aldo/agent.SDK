@@ -1,0 +1,24 @@
+{
+  "customer_data": {
+    "name": "Juan Pérez",
+    "email": "juan.perez@ejemplo.com",
+    "age": 35,
+    "gender": "masculino",
+    "occupation": "ingeniero",
+    "goals": {
+      "primary": "mejorar condición física",
+      "secondary": "aumentar masa muscular"
+    },
+    "fitness_metrics": {
+      "height_cm": 175,
+      "weight_kg": 80,
+      "activity_level": "moderado"
+    },
+    "lifestyle": {
+      "diet": "equilibrada",
+      "sleep_hours": 7,
+      "stress_level": "medio"
+    }
+  },
+  "program_type": "PRIME"
+}

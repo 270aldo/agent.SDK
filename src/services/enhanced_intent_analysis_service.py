@@ -12,7 +12,7 @@ from datetime import datetime
 import numpy as np
 from collections import Counter
 
-from src.integrations.supabase import supabase_client
+from src.integrations.supabase import resilient_supabase_client
 
 # Configurar logging
 logger = logging.getLogger(__name__)
@@ -109,11 +109,26 @@ class EnhancedIntentAnalysisService:
         Args:
             industry: Industria para personalizar las palabras clave
         """
-        self.industry = industry
+        self.industry = industry.lower()
         self.purchase_intent_keywords = self._get_industry_intent_keywords(industry)
         self.rejection_keywords = self._get_industry_rejection_keywords(industry)
-        self.intent_model = self._load_intent_model()
+        self.intent_model = None
         logger.info(f"Servicio de análisis de intención mejorado inicializado para industria: {industry}")
+        
+    @classmethod
+    async def create(cls, industry: str = 'salud'):
+        """
+        Método de fábrica para crear una instancia del servicio de forma asíncrona.
+        
+        Args:
+            industry: Industria para personalizar las palabras clave
+            
+        Returns:
+            EnhancedIntentAnalysisService: Instancia inicializada del servicio
+        """
+        instance = cls(industry)
+        instance.intent_model = await instance._load_intent_model()
+        return instance
     
     def _get_industry_intent_keywords(self, industry: str) -> List[str]:
         """
@@ -143,7 +158,7 @@ class EnhancedIntentAnalysisService:
         industry_keywords = self.INDUSTRY_KEYWORDS.get(industry, {}).get('rejection', [])
         return self.BASE_REJECTION_KEYWORDS + industry_keywords
     
-    def _load_intent_model(self) -> Dict[str, Any]:
+    async def _load_intent_model(self) -> Dict[str, Any]:
         """
         Carga el modelo de intención de compra desde el almacenamiento.
         Si no existe, crea uno nuevo.
@@ -152,16 +167,14 @@ class EnhancedIntentAnalysisService:
             Dict: Modelo de intención de compra
         """
         try:
-            # Intentar cargar el modelo desde Supabase
-            result = supabase_client.table('intent_models') \
-                .select('*') \
-                .eq('industry', self.industry) \
-                .order('created_at', desc=True) \
-                .limit(1) \
-                .execute()
-                
-            if result.data:
-                model_data = result.data[0]
+            # Buscar modelo existente para la industria usando el cliente resiliente
+            result = await resilient_supabase_client.select(
+                table='intent_models',
+                filters={'industry': self.industry}
+            )
+            
+            if result and len(result) > 0:
+                model_data = result[0]
                 logger.info(f"Modelo de intención cargado para industria {self.industry}")
                 return {
                     'id': model_data['id'],
@@ -215,17 +228,20 @@ class EnhancedIntentAnalysisService:
                 'created_at': model['created_at']
             }
             
-            result = supabase_client.table('intent_models').insert(model_data).execute()
+            result = await resilient_supabase_client.insert(
+                table='intent_models',
+                data=model_data
+            )
             
-            if result.data:
-                model['id'] = result.data[0]['id']
+            if result and len(result) > 0:
+                model['id'] = result[0]['id']
                 logger.info(f"Nuevo modelo de intención guardado con ID: {model['id']}")
         except Exception as e:
             logger.error(f"Error al guardar el modelo de intención: {e}")
         
         return model
     
-    def analyze_purchase_intent(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
+    async def analyze_purchase_intent(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
         """
         Analiza la intención de compra en los mensajes de una conversación.
         Incorpora análisis de sentimiento y palabras clave específicas por industria.
@@ -278,10 +294,10 @@ class EnhancedIntentAnalysisService:
         rejection_indicators = list(set(rejection_indicators))
         
         # Análisis de sentimiento
-        sentiment_score = self._analyze_sentiment(recent_messages)
+        sentiment_score = await self._analyze_sentiment(recent_messages)
         
         # Análisis de engagement
-        engagement_score = self._analyze_engagement(recent_messages)
+        engagement_score = await self._analyze_engagement(recent_messages)
         
         # Calcular probabilidad de compra
         intent_score = sum(intent_scores) * 0.15  # Cada indicador suma según su peso
@@ -314,9 +330,10 @@ class EnhancedIntentAnalysisService:
         }
         
         logger.info(f"Análisis de intención mejorado: {result}")
+        
         return result
     
-    def _analyze_sentiment(self, messages: List[str]) -> float:
+    async def _analyze_sentiment(self, messages: List[str]) -> float:
         """
         Analiza el sentimiento en los mensajes del usuario.
         
@@ -351,7 +368,7 @@ class EnhancedIntentAnalysisService:
         
         return (positive_count - negative_count) / total_indicators
     
-    def _analyze_engagement(self, messages: List[str]) -> float:
+    async def _analyze_engagement(self, messages: List[str]) -> float:
         """
         Analiza el nivel de engagement del usuario basado en la longitud de los mensajes,
         uso de preguntas, etc.
@@ -381,10 +398,9 @@ class EnhancedIntentAnalysisService:
         
         return engagement_score
     
-    def should_continue_conversation(self, 
-                                    messages: List[Dict[str, str]], 
+    async def should_continue_conversation(self, messages: List[Dict[str, str]], 
                                     session_start_time: datetime,
-                                    intent_detection_timeout: int) -> Tuple[bool, Optional[str]]:
+                                    intent_detection_timeout: int = 300) -> Tuple[bool, Optional[str]]:
         """
         Determina si una conversación debe continuar basado en la intención de compra y el tiempo.
         
@@ -404,7 +420,7 @@ class EnhancedIntentAnalysisService:
             return True, None
         
         # Analizar intención de compra
-        intent_analysis = self.analyze_purchase_intent(messages)
+        intent_analysis = await self.analyze_purchase_intent(messages)
         
         # Si hay intención de compra, continuar la conversación
         if intent_analysis["has_purchase_intent"]:
@@ -417,8 +433,7 @@ class EnhancedIntentAnalysisService:
         # Si no hay intención de compra después del tiempo límite, finalizar
         return False, "no_intent_detected"
     
-    async def update_model_from_conversation(self, 
-                                           conversation_id: str, 
+    async def update_model_from_conversation(self, conversation_id: str, 
                                            messages: List[Dict[str, str]], 
                                            conversion_result: bool) -> bool:
         """
@@ -500,12 +515,13 @@ class EnhancedIntentAnalysisService:
                     'updated_at': updated_model['updated_at']
                 }
                 
-                result = supabase_client.table('intent_models') \
-                    .update(model_data) \
-                    .eq('id', self.intent_model['id']) \
-                    .execute()
+                result = await resilient_supabase_client.update(
+                    table='intent_models',
+                    data=model_data,
+                    filters={'id': self.intent_model['id']}
+                )
                 
-                if result.data:
+                if result.get('data'):
                     logger.info(f"Modelo de intención actualizado con ID: {self.intent_model['id']}")
                     # Actualizar modelo local
                     self.intent_model = updated_model

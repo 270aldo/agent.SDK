@@ -32,6 +32,7 @@ from src.services.qualification_service import LeadQualificationService
 from src.services.human_transfer_service import HumanTransferService
 from src.services.follow_up_service import FollowUpService
 from src.services.personalization_service import PersonalizationService
+from src.services.nlp_integration_service import NLPIntegrationService
 
 # Configurar logging
 logger = logging.getLogger(__name__)
@@ -58,6 +59,9 @@ class ConversationService:
         self.human_transfer_service = HumanTransferService()
         self.follow_up_service = FollowUpService()
         self.personalization_service = PersonalizationService()
+        
+        # Inicializar servicio integrado de NLP
+        self.nlp_service = NLPIntegrationService()
     
     async def start_conversation(self, customer_data: CustomerData, program_type: str = "PRIME") -> ConversationState:
         """
@@ -169,37 +173,54 @@ class ConversationService:
         if transfer_requested:
             try:
                 logger.info(f"Usuario ha solicitado transferencia a agente humano en conversación {conversation_id}")
-                # Registrar solicitud de transferencia
-                transfer_result = await self.human_transfer_service.register_transfer_request(
-                    conversation_id, 
-                    state.customer_id
-                )
-                
-                # Actualizar estado de la conversación
-                state.human_transfer_requested = True
-                state.human_transfer_status = "pending"
-                state.human_transfer_request_id = transfer_result.get("id")
-                
-                # Generar mensaje de transferencia
-                response_text = self.human_transfer_service.generate_transfer_message(wait_time=2)
-                
-                state.add_message(role="assistant", content=response_text)
-                state.updated_at = datetime.now()
-                await self._save_conversation_state(state)
-                
-                # Generar audio de respuesta
-                customer_gender = "male"
-                if state.customer_data and isinstance(state.customer_data, dict):
-                    customer_gender = state.customer_data.get("gender", "male")
-                
-                audio_stream = await voice_engine.text_to_speech_async(
-                    text=response_text,
-                    program_type=state.program_type,
-                    gender=customer_gender
-                )
-                
-                logger.info(f"Solicitud de transferencia a humano registrada para conversación {state.id}")
-                return state, audio_stream
+                # Verificar si se necesita transferir a un humano
+                if check_intent:
+                    # Obtener insights de NLP para la conversación
+                    conversation_insights = await asyncio.to_thread(
+                        lambda: self.nlp_service.get_conversation_insights(conversation_id)
+                    )
+                    
+                    # Agregar insights de NLP a los insights de la sesión
+                    state.session_insights['nlp_insights'] = conversation_insights
+                    
+                    # Verificar transferencia usando tanto los insights tradicionales como los de NLP
+                    enhanced_insights = {
+                        **state.session_insights,
+                        'nlp_conversation_insights': conversation_insights
+                    }
+                    
+                    transfer_needed = await asyncio.to_thread(
+                        lambda: self.human_transfer_service.check_transfer_needed(enhanced_insights)
+                    )
+                    
+                    if transfer_needed['transfer_needed']:
+                        # Actualizar estado para indicar transferencia
+                        state.phase = "human_transfer"
+                        state.session_insights['human_transfer'] = transfer_needed
+                        
+                        # Generar mensaje de transferencia
+                        transfer_message = await asyncio.to_thread(
+                            lambda: self.human_transfer_service.generate_transfer_message(transfer_needed['reason'])
+                        )
+                        
+                        # Agregar mensaje al historial
+                        state.messages.append(
+                            Message(
+                                role="assistant",
+                                content=transfer_message,
+                                timestamp=datetime.now()
+                            )
+                        )
+                        
+                        # Generar audio para el mensaje de transferencia
+                        audio_response = await asyncio.to_thread(
+                            lambda: voice_engine.text_to_speech(transfer_message)
+                        )
+                        
+                        # Guardar estado actualizado
+                        await self._save_conversation_state(state)
+                        
+                        return state, audio_response
             except Exception as e:
                 logger.error(f"Error al procesar solicitud de transferencia: {e}")
                 # Continuar con el flujo normal si hay un error
@@ -247,6 +268,28 @@ class ConversationService:
                 
                 logger.info(f"Conversación {state.id} finalizada por corte inteligente: {end_reason}")
                 return state, audio_stream
+        
+        # Analizar mensaje con el servicio integrado de NLP
+        if check_intent:
+            # Análisis completo de NLP
+            nlp_analysis = await asyncio.to_thread(
+                lambda: self.nlp_service.analyze_message(message_text, conversation_id)
+            )
+            
+            # Análisis de intención (mantener para compatibilidad)
+            intent_analysis = await asyncio.to_thread(
+                lambda: self.enhanced_intent_service.analyze_message(message_text)
+            )
+            
+            # Actualizar insights de la sesión
+            if 'session_insights' not in state.model_dump():
+                state.session_insights = {}
+            
+            # Guardar análisis de intención (compatibilidad)
+            state.session_insights['intent_analysis'] = intent_analysis
+            
+            # Guardar análisis completo de NLP
+            state.session_insights['nlp_analysis'] = nlp_analysis
         
         formatted_history = state.get_formatted_message_history()
 
@@ -395,11 +438,36 @@ class ConversationService:
         state.updated_at = datetime.now()
         await self._save_conversation_state(state)
         
-        # Analizar intención de compra para programar seguimiento
+        # Realizar análisis final de NLP para toda la conversación
         try:
-            # Obtener todas las conversaciones para analizar intención
+            # Obtener todas las conversaciones para analizar
             formatted_history = state.get_formatted_message_history()
+            
+            # Análisis completo de NLP
+            final_nlp_analysis = await asyncio.to_thread(
+                lambda: self.nlp_service.analyze_conversation(formatted_history, conversation_id)
+            )
+            
+            # Obtener insights finales
+            final_insights = await asyncio.to_thread(
+                lambda: self.nlp_service.get_conversation_insights(conversation_id)
+            )
+            
+            # Guardar análisis final e insights en el estado
+            if 'session_insights' not in state.model_dump():
+                state.session_insights = {}
+                
+            state.session_insights['final_nlp_analysis'] = final_nlp_analysis
+            state.session_insights['final_nlp_insights'] = final_insights
+            
+            # Análisis de intención tradicional (para compatibilidad)
             intent_analysis = self.intent_analysis_service.analyze_purchase_intent(formatted_history)
+            
+            # Enriquecer el análisis de intención con los insights de NLP
+            if 'intent' in final_insights and 'conversation_status' in final_insights:
+                if final_insights['conversation_status'].get('conversation_phase') == 'decisión':
+                    intent_analysis['purchase_intent_probability'] = max(intent_analysis['purchase_intent_probability'], 0.7)
+                    intent_analysis['has_purchase_intent'] = True
             
             # Si hay alta intención de compra, programar seguimiento
             if intent_analysis["has_purchase_intent"] and intent_analysis["purchase_intent_probability"] >= 0.6:
@@ -498,7 +566,7 @@ class ConversationService:
     
     async def _get_conversation_state(self, conversation_id: str) -> Optional[ConversationState]:
         """
-{{ ... }}
+        Obtener el estado de una conversación.
         
         Args:
             conversation_id (str): ID de la conversación
