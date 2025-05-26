@@ -10,7 +10,7 @@ from typing import List, Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-from .jwt_handler import JWTHandler
+from .jwt_functions import verify_token
 from .auth_utils import TokenData, get_token_data, verify_permissions
 
 logger = logging.getLogger(__name__)

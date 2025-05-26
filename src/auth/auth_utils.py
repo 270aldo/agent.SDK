@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Any
 from fastapi import HTTPException, status
 from pydantic import BaseModel
 
-from .jwt_handler import JWTHandler
+from .jwt_functions import verify_token
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ def get_token_data(token: str) -> TokenData:
         HTTPException: Si el token es inválido o ha expirado
     """
     try:
-        payload = JWTHandler.verify_token(token)
+        payload = verify_token(token)
         token_data = TokenData(
             user_id=payload.get("sub"),
             username=payload.get("username"),

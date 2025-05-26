@@ -28,14 +28,27 @@ if not os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS"):
 if not os.getenv("ENVIRONMENT"):
     os.environ["ENVIRONMENT"] = "testing"
 
-# Importar la aplicación después de configurar las variables de entorno
-from src.api.main import app
+# Importar la aplicación solo si se necesita para pruebas de integración
+# Comentamos esta línea para evitar problemas con las pruebas unitarias
+# from src.api.main import app
+
+# Función para obtener la aplicación bajo demanda
+def get_app():
+    """Obtiene la aplicación FastAPI bajo demanda."""
+    # Importar solo cuando sea necesario para evitar problemas de importación circular
+    import sys
+    import os
+    # Asegurarse de que src esté en el path
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))    
+    from src.api.main import app
+    return app
 
 @pytest.fixture
 def client():
     """
     Fixture que proporciona un cliente de prueba para la API.
     """
+    app = get_app()
     with TestClient(app) as test_client:
         yield test_client
 

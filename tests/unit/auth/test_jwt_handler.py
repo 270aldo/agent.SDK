@@ -9,7 +9,7 @@ import pytest
 import jwt
 import time
 from datetime import datetime, timedelta
-from src.auth.jwt_handler import (
+from src.auth.jwt_functions import (
     create_access_token,
     create_refresh_token,
     decode_token,

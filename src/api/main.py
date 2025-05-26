@@ -14,7 +14,7 @@ from src.utils.structured_logging import StructuredLogger
 
 from src.api.middleware.rate_limiter import RateLimiter, get_user_from_request
 from src.api.middleware.error_handlers import http_exception_handler, validation_exception_handler, internal_exception_handler
-from src.auth.jwt_handler import decode_token
+from src.auth.jwt_functions import decode_token
 from .routers import conversation
 from .routers import qualification
 from .routers import analytics
