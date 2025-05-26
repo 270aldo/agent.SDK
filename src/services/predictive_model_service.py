@@ -50,8 +50,9 @@ class PredictiveModelService:
                 "model_training_data"
             ]
             
+            actual_supabase_client = self.supabase._base_client.get_client()
             for table in tables:
-                result = self.supabase.table(table).select("count(*)", count="exact").execute()
+                result = actual_supabase_client.table(table).select("*", count="exact").execute()
                 logger.info(f"Tabla {table} verificada: {result}")
                 
         except Exception as e:
