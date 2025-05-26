@@ -7,6 +7,7 @@ from .routers import conversation
 from .routers import qualification
 from .routers import analytics
 from .routers import predictive
+from .routers import model_training
 
 # Cargar variables de entorno
 load_dotenv()
@@ -39,6 +40,7 @@ app.include_router(conversation.router)
 app.include_router(qualification.router)
 app.include_router(analytics.router)
 app.include_router(predictive.router)
+app.include_router(model_training.router)
 
 @app.get("/health")
 async def health_check():

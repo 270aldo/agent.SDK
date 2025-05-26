@@ -565,12 +565,181 @@ Obtiene estadísticas sobre el motor de decisiones.
 | `RATE_LIMIT_EXCEEDED` | Se ha excedido el límite de solicitudes |
 | `INTERNAL_SERVER_ERROR` | Error interno del servidor |
 
+### Entrenamiento Automático de Modelos
+
+#### POST /training/schedule
+
+Programa el entrenamiento de un modelo predictivo.
+
+**Parámetros de solicitud:**
+
+```json
+{
+  "model_name": "string",
+  "force_training": false,
+  "training_config": {
+    "param_exploration_rate": 0.2,
+    "param_adaptation_threshold": 0.3
+  }
+}
+```
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "success": true,
+    "training_id": "training-decision_engine_model-20250525201530",
+    "message": "Entrenamiento programado para el modelo 'decision_engine_model'",
+    "estimated_completion": "2025-05-25T21:00:00Z"
+  },
+  "error": null
+}
+```
+
+#### GET /training/status/{training_id}
+
+Obtiene el estado actual de un entrenamiento.
+
+**Parámetros de ruta:**
+
+- `training_id`: ID del entrenamiento
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "success": true,
+    "training_id": "training-decision_engine_model-20250525201530",
+    "model_name": "decision_engine_model",
+    "status": "in_progress",
+    "start_time": "2025-05-25T20:15:30Z",
+    "progress": 0.5,
+    "metrics": null
+  },
+  "error": null
+}
+```
+
+#### GET /training/list
+
+Lista los entrenamientos de modelos con filtros opcionales.
+
+**Parámetros de consulta:**
+
+- `model_name` (opcional): Filtrar por nombre de modelo
+- `status` (opcional): Filtrar por estado (scheduled, in_progress, completed, failed)
+- `limit` (opcional): Número máximo de registros a devolver (por defecto: 10)
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "success": true,
+    "trainings": [
+      {
+        "id": "training-decision_engine_model-20250525201530",
+        "model_name": "decision_engine_model",
+        "status": "completed",
+        "start_time": "2025-05-25T20:15:30Z",
+        "end_time": "2025-05-25T20:45:30Z",
+        "metrics": {
+          "accuracy": 0.85,
+          "precision": 0.82,
+          "recall": 0.87,
+          "f1_score": 0.84
+        }
+      },
+      {
+        "id": "training-objection_prediction_model-20250525195530",
+        "model_name": "objection_prediction_model",
+        "status": "completed",
+        "start_time": "2025-05-25T19:55:30Z",
+        "end_time": "2025-05-25T20:25:30Z",
+        "metrics": {
+          "accuracy": 0.78,
+          "precision": 0.75,
+          "recall": 0.82,
+          "f1_score": 0.78
+        }
+      }
+    ],
+    "count": 2
+  },
+  "error": null
+}
+```
+
+#### GET /training/criteria/{model_name}
+
+Verifica si un modelo cumple con los criterios para ser reentrenado.
+
+**Parámetros de ruta:**
+
+- `model_name`: Nombre del modelo a verificar
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "model_name": "decision_engine_model",
+    "should_train": true,
+    "reason": "Han pasado 10 días desde el último entrenamiento"
+  },
+  "error": null
+}
+```
+
+#### POST /training/auto-schedule
+
+Programa automáticamente el entrenamiento de todos los modelos que cumplan con los criterios.
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "scheduled_trainings": [
+      {
+        "model_name": "decision_engine_model",
+        "training_id": "training-decision_engine_model-20250525201530",
+        "reason": "Han pasado 10 días desde el último entrenamiento"
+      },
+      {
+        "model_name": "objection_prediction_model",
+        "training_id": "training-objection_prediction_model-20250525201531",
+        "reason": "Hay 65 registros de retroalimentación nuevos"
+      }
+    ],
+    "skipped_models": [
+      {
+        "model_name": "needs_prediction_model",
+        "reason": "No se cumplen los criterios para reentrenamiento"
+      }
+    ],
+    "total_scheduled": 2,
+    "total_skipped": 1
+  },
+  "error": null
+}
+```
+
 ## Limitaciones
 
 - Máximo 10 solicitudes por segundo por cliente
 - Máximo 100,000 solicitudes por día por cliente
 - Tamaño máximo de solicitud: 1MB
 - Máximo 50 mensajes por conversación en una solicitud
+- Los entrenamientos de modelos pueden tardar hasta 30 minutos en completarse
 
 ## Ejemplos de Uso
 
