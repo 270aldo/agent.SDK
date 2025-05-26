@@ -345,3 +345,127 @@ async def test_evaluate_conversation_path(decision_engine_service):
     assert "conversion_probability" in result["metrics"]
     assert "objections_addressed" in result["metrics"]
     assert "needs_satisfied" in result["metrics"]
+
+@pytest.mark.asyncio
+async def test_log_feedback(decision_engine_service, mock_supabase):
+    """Prueba el registro de retroalimentación para mejorar el modelo."""
+    # Configurar el mock de Supabase para simular inserción exitosa
+    mock_supabase.table.return_value.insert.return_value.execute.return_value = {
+        "data": [{"id": "feedback-123"}],
+        "error": None
+    }
+    
+    # Datos de prueba
+    prediction_id = str(uuid.uuid4())
+    feedback_rating = 0.8
+    feedback_details = {
+        "accuracy": "high",
+        "usefulness": "very_useful",
+        "comments": "Las recomendaciones fueron muy acertadas"
+    }
+    
+    # Ejecutar la función a probar
+    result = await decision_engine_service.log_feedback(
+        conversation_id=MOCK_CONVERSATION_ID,
+        prediction_id=prediction_id,
+        feedback_rating=feedback_rating,
+        feedback_details=feedback_details
+    )
+    
+    # Verificar que se llamó a Supabase con los parámetros correctos
+    mock_supabase.table.assert_called_with("feedback")
+    mock_supabase.table().insert.assert_called_once()
+    
+    # Verificar el resultado
+    assert "feedback_id" in result
+    assert "timestamp" in result
+    assert result["success"] is True
+
+@pytest.mark.asyncio
+async def test_update_feedback_metrics(decision_engine_service, mock_supabase):
+    """Prueba la actualización de métricas basadas en retroalimentación."""
+    # Configurar el mock de Supabase para simular obtención de métricas actuales
+    mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = {
+        "data": [{
+            "id": "metrics-123",
+            "model_name": "decision_engine_model",
+            "metrics": json.dumps({
+                "feedback_count": 10,
+                "average_rating": 0.75,
+                "rating_distribution": {
+                    "excellent": 5,
+                    "good": 3,
+                    "average": 2,
+                    "poor": 0
+                }
+            })
+        }],
+        "error": None
+    }
+    
+    # Configurar el mock para la actualización
+    mock_supabase.table.return_value.update.return_value.eq.return_value.execute.return_value = {
+        "data": [{"id": "metrics-123"}],
+        "error": None
+    }
+    
+    # Datos de prueba
+    feedback_rating = 0.9
+    feedback_details = {
+        "accuracy": "excellent",
+        "usefulness": "very_useful"
+    }
+    
+    # Ejecutar la función a probar
+    await decision_engine_service._update_feedback_metrics(
+        feedback_rating=feedback_rating,
+        feedback_details=feedback_details
+    )
+    
+    # Verificar que se llamó a Supabase para obtener y actualizar métricas
+    mock_supabase.table.assert_any_call("model_metrics")
+    mock_supabase.table().select.assert_called_once()
+    mock_supabase.table().update.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_get_feedback_statistics(decision_engine_service, mock_supabase):
+    """Prueba la obtención de estadísticas de retroalimentación."""
+    # Configurar el mock de Supabase para simular obtención de datos
+    mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = {
+        "data": [{
+            "id": "feedback-123",
+            "conversation_id": MOCK_CONVERSATION_ID,
+            "prediction_id": str(uuid.uuid4()),
+            "rating": 0.8,
+            "details": json.dumps({
+                "accuracy": "high",
+                "usefulness": "very_useful"
+            }),
+            "created_at": "2025-05-25T20:15:00Z"
+        }, {
+            "id": "feedback-124",
+            "conversation_id": "conv-789",
+            "prediction_id": str(uuid.uuid4()),
+            "rating": 0.6,
+            "details": json.dumps({
+                "accuracy": "medium",
+                "usefulness": "useful"
+            }),
+            "created_at": "2025-05-25T20:30:00Z"
+        }],
+        "error": None
+    }
+    
+    # Ejecutar la función a probar
+    result = await decision_engine_service.get_feedback_statistics(time_period=30)
+    
+    # Verificar que se llamó a Supabase con los parámetros correctos
+    mock_supabase.table.assert_called_with("feedback")
+    mock_supabase.table().select.assert_called_once()
+    
+    # Verificar el resultado
+    assert "average_rating" in result
+    assert "feedback_count" in result
+    assert "rating_distribution" in result
+    assert "recent_feedback" in result
+    assert len(result["recent_feedback"]) > 0

@@ -5,7 +5,9 @@ Esta API expone los servicios de predicción de objeciones, necesidades,
 conversión y el motor de decisiones para optimizar las conversaciones de ventas.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Body
+from fastapi import APIRouter, HTTPException, Depends, Body, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
@@ -22,7 +24,38 @@ from src.services.entity_recognition_service import EntityRecognitionService
 router = APIRouter(
     prefix="/predictive",
     tags=["predictive"],
-    responses={404: {"description": "No encontrado"}},
+    responses={
+        404: {
+            "model": dict,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "data": None,
+                        "error": {
+                            "code": "RESOURCE_NOT_FOUND",
+                            "message": "El recurso solicitado no existe"
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "model": dict,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "data": None,
+                        "error": {
+                            "code": "INTERNAL_SERVER_ERROR",
+                            "message": "Error interno del servidor"
+                        }
+                    }
+                }
+            }
+        }
+    },
 )
 
 # Instanciar servicios
@@ -83,9 +116,23 @@ async def predict_objections(
             customer_profile=customer_profile
         )
         
-        return prediction
+        return {
+            "success": True,
+            "data": prediction,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al predecir objeciones: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "MODEL_ERROR",
+                    "message": f"Error al predecir objeciones: {str(e)}"
+                }
+            }
+        )
 
 @router.post("/objections/record")
 async def record_objection(
@@ -111,9 +158,23 @@ async def record_objection(
             objection_text=objection_text
         )
         
-        return result
+        return {
+            "success": True,
+            "data": result,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al registrar objeción: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "MODEL_ERROR",
+                    "message": f"Error al registrar objeción: {str(e)}"
+                }
+            }
+        )
 
 @router.get("/objections/statistics")
 async def get_objection_statistics(time_period: Optional[int] = None) -> Dict[str, Any]:
@@ -128,9 +189,23 @@ async def get_objection_statistics(time_period: Optional[int] = None) -> Dict[st
     """
     try:
         statistics = await objection_prediction_service.get_objection_statistics(time_period)
-        return statistics
+        return {
+            "success": True,
+            "data": statistics,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": f"Error al obtener estadísticas: {str(e)}"
+                }
+            }
+        )
 
 # Rutas para predicción de necesidades
 @router.post("/needs/predict")
@@ -157,9 +232,23 @@ async def predict_needs(
             customer_profile=customer_profile
         )
         
-        return prediction
+        return {
+            "success": True,
+            "data": prediction,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al predecir necesidades: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "MODEL_ERROR",
+                    "message": f"Error al predecir necesidades: {str(e)}"
+                }
+            }
+        )
 
 @router.post("/needs/record")
 async def record_need(
@@ -185,9 +274,23 @@ async def record_need(
             need_description=need_description
         )
         
-        return result
+        return {
+            "success": True,
+            "data": result,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al registrar necesidad: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "MODEL_ERROR",
+                    "message": f"Error al registrar necesidad: {str(e)}"
+                }
+            }
+        )
 
 @router.get("/needs/statistics")
 async def get_needs_statistics(time_period: Optional[int] = None) -> Dict[str, Any]:
@@ -202,9 +305,23 @@ async def get_needs_statistics(time_period: Optional[int] = None) -> Dict[str, A
     """
     try:
         statistics = await needs_prediction_service.get_needs_statistics(time_period)
-        return statistics
+        return {
+            "success": True,
+            "data": statistics,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": f"Error al obtener estadísticas: {str(e)}"
+                }
+            }
+        )
 
 # Rutas para predicción de conversión
 @router.post("/conversion/predict")
@@ -231,9 +348,23 @@ async def predict_conversion(
             customer_profile=customer_profile
         )
         
-        return prediction
+        return {
+            "success": True,
+            "data": prediction,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al predecir conversión: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "MODEL_ERROR",
+                    "message": f"Error al predecir conversión: {str(e)}"
+                }
+            }
+        )
 
 @router.post("/conversion/record")
 async def record_conversion(
@@ -259,9 +390,23 @@ async def record_conversion(
             conversion_details=conversion_details
         )
         
-        return result
+        return {
+            "success": True,
+            "data": result,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al registrar conversión: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "MODEL_ERROR",
+                    "message": f"Error al registrar conversión: {str(e)}"
+                }
+            }
+        )
 
 @router.get("/conversion/statistics")
 async def get_conversion_statistics(time_period: Optional[int] = None) -> Dict[str, Any]:
@@ -276,9 +421,23 @@ async def get_conversion_statistics(time_period: Optional[int] = None) -> Dict[s
     """
     try:
         statistics = await conversion_prediction_service.get_conversion_statistics(time_period)
-        return statistics
+        return {
+            "success": True,
+            "data": statistics,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": f"Error al obtener estadísticas: {str(e)}"
+                }
+            }
+        )
 
 # Rutas para motor de decisiones
 @router.post("/decision/optimize")
@@ -301,16 +460,30 @@ async def optimize_conversation_flow(
         Dict: Recomendaciones de flujo optimizado
     """
     try:
-        optimization = await decision_engine_service.optimize_conversation_flow(
+        optimized_flow = await decision_engine_service.optimize_conversation_flow(
             conversation_id=conversation_id,
             messages=messages,
             customer_profile=customer_profile,
             current_objectives=current_objectives
         )
         
-        return optimization
+        return {
+            "success": True,
+            "data": optimized_flow,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al optimizar flujo: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "MODEL_ERROR",
+                    "message": f"Error al optimizar flujo: {str(e)}"
+                }
+            }
+        )
 
 @router.post("/decision/adapt")
 async def adapt_strategy_realtime(
@@ -334,7 +507,7 @@ async def adapt_strategy_realtime(
         Dict: Estrategia adaptada con nuevas acciones recomendadas
     """
     try:
-        adaptation = await decision_engine_service.adapt_strategy_realtime(
+        adapted_strategy = await decision_engine_service.adapt_strategy_realtime(
             conversation_id=conversation_id,
             messages=messages,
             current_strategy=current_strategy,
@@ -342,9 +515,23 @@ async def adapt_strategy_realtime(
             customer_profile=customer_profile
         )
         
-        return adaptation
+        return {
+            "success": True,
+            "data": adapted_strategy,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al adaptar estrategia: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "MODEL_ERROR",
+                    "message": f"Error al adaptar estrategia: {str(e)}"
+                }
+            }
+        )
 
 @router.post("/decision/prioritize")
 async def prioritize_objectives(
@@ -401,9 +588,23 @@ async def evaluate_conversation_path(
             customer_profile=customer_profile
         )
         
-        return evaluation
+        return {
+            "success": True,
+            "data": evaluation,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al evaluar ruta: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "MODEL_ERROR",
+                    "message": f"Error al evaluar ruta: {str(e)}"
+                }
+            }
+        )
 
 @router.get("/decision/statistics")
 async def get_decision_statistics(time_period: Optional[int] = None) -> Dict[str, Any]:
@@ -418,9 +619,151 @@ async def get_decision_statistics(time_period: Optional[int] = None) -> Dict[str
     """
     try:
         statistics = await decision_engine_service.get_decision_statistics(time_period)
-        return statistics
+        return {
+            "success": True,
+            "data": statistics,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": f"Error al obtener estadísticas: {str(e)}"
+                }
+            }
+        )
+
+# Rutas para retroalimentación de modelos
+@router.post("/feedback")
+async def submit_model_feedback(
+    conversation_id: str,
+    model_type: str = Body(...),
+    prediction_id: str = Body(...),
+    feedback_rating: float = Body(...),
+    feedback_details: Optional[Dict[str, Any]] = Body(None)
+) -> Dict[str, Any]:
+    """
+    Registra retroalimentación sobre una predicción para mejorar el modelo.
+    
+    Args:
+        conversation_id: ID de la conversación
+        model_type: Tipo de modelo (objection, needs, conversion, decision_engine)
+        prediction_id: ID de la predicción
+        feedback_rating: Valoración de 0 a 1 sobre la precisión
+        feedback_details: Detalles adicionales sobre la retroalimentación
+        
+    Returns:
+        Dict: Resultado del registro de retroalimentación
+    """
+    try:
+        # Seleccionar el servicio adecuado según el tipo de modelo
+        service = None
+        if model_type == "objection":
+            service = objection_prediction_service
+        elif model_type == "needs":
+            service = needs_prediction_service
+        elif model_type == "conversion":
+            service = conversion_prediction_service
+        elif model_type == "decision_engine":
+            service = decision_engine_service
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "data": None,
+                    "error": {
+                        "code": "INVALID_REQUEST",
+                        "message": f"Tipo de modelo '{model_type}' no válido"
+                    }
+                }
+            )
+        
+        # Registrar retroalimentación
+        result = await service.log_feedback(
+            conversation_id=conversation_id,
+            prediction_id=prediction_id,
+            feedback_rating=feedback_rating,
+            feedback_details=feedback_details
+        )
+        
+        # Actualizar métricas del modelo
+        await service._update_feedback_metrics(feedback_rating, feedback_details)
+        
+        return {
+            "success": True,
+            "data": result,
+            "error": None
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "MODEL_ERROR",
+                    "message": f"Error al registrar retroalimentación: {str(e)}"
+                }
+            }
+        )
+
+@router.get("/feedback/statistics")
+async def get_feedback_statistics(
+    model_type: Optional[str] = None,
+    time_period: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Obtiene estadísticas sobre la retroalimentación de los modelos.
+    
+    Args:
+        model_type: Tipo de modelo para filtrar (opcional)
+        time_period: Período de tiempo en días (opcional)
+        
+    Returns:
+        Dict: Estadísticas de retroalimentación
+    """
+    try:
+        # Obtener estadísticas de todos los servicios
+        statistics = {}
+        
+        if model_type is None or model_type == "objection":
+            objection_stats = await objection_prediction_service.get_feedback_statistics(time_period)
+            statistics["objection"] = objection_stats
+        
+        if model_type is None or model_type == "needs":
+            needs_stats = await needs_prediction_service.get_feedback_statistics(time_period)
+            statistics["needs"] = needs_stats
+        
+        if model_type is None or model_type == "conversion":
+            conversion_stats = await conversion_prediction_service.get_feedback_statistics(time_period)
+            statistics["conversion"] = conversion_stats
+        
+        if model_type is None or model_type == "decision_engine":
+            decision_stats = await decision_engine_service.get_feedback_statistics(time_period)
+            statistics["decision_engine"] = decision_stats
+        
+        return {
+            "success": True,
+            "data": statistics,
+            "error": None
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": f"Error al obtener estadísticas de retroalimentación: {str(e)}"
+                }
+            }
+        )
 
 # Rutas para gestión de modelos predictivos
 @router.get("/models")
@@ -436,9 +779,23 @@ async def list_models(model_type: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     try:
         models = await predictive_model_service.list_models(model_type)
-        return models
+        return {
+            "success": True,
+            "data": models,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al listar modelos: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": f"Error al listar modelos: {str(e)}"
+                }
+            }
+        )
 
 @router.get("/models/{model_name}")
 async def get_model(model_name: str) -> Dict[str, Any]:
@@ -455,13 +812,35 @@ async def get_model(model_name: str) -> Dict[str, Any]:
         model = await predictive_model_service.get_model(model_name)
         
         if not model:
-            raise HTTPException(status_code=404, detail=f"Modelo '{model_name}' no encontrado")
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "success": False,
+                    "data": None,
+                    "error": {
+                        "code": "RESOURCE_NOT_FOUND",
+                        "message": f"Modelo '{model_name}' no encontrado"
+                    }
+                }
+            )
         
-        return model
-    except HTTPException:
-        raise
+        return {
+            "success": True,
+            "data": model,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al obtener modelo: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": f"Error al obtener modelo: {str(e)}"
+                }
+            }
+        )
 
 @router.put("/models/{model_name}")
 async def update_model(
@@ -486,7 +865,17 @@ async def update_model(
         model = await predictive_model_service.get_model(model_name)
         
         if not model:
-            raise HTTPException(status_code=404, detail=f"Modelo '{model_name}' no encontrado")
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "success": False,
+                    "data": None,
+                    "error": {
+                        "code": "RESOURCE_NOT_FOUND",
+                        "message": f"Modelo '{model_name}' no encontrado"
+                    }
+                }
+            )
         
         updated_model = await predictive_model_service.update_model(
             model_name=model_name,
@@ -495,8 +884,20 @@ async def update_model(
             accuracy=accuracy
         )
         
-        return updated_model
-    except HTTPException:
-        raise
+        return {
+            "success": True,
+            "data": updated_model,
+            "error": None
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al actualizar modelo: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "data": None,
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": f"Error al actualizar modelo: {str(e)}"
+                }
+            }
+        )

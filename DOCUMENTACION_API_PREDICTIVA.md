@@ -18,10 +18,602 @@ Todas las llamadas a la API requieren autenticación mediante un token JWT en la
 Authorization: Bearer <token>
 ```
 
+## Formatos de Respuesta
+
+Todas las respuestas de la API siguen el siguiente formato:
+
+```json
+{
+  "success": true,
+  "data": { ... },
+  "error": null
+}
+```
+
+En caso de error:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Descripción del error"
+  }
+}
+```
+
 ## Endpoints
 
 ### Predicción de Objeciones
 
+#### POST /objections/predict
+
+Predice posibles objeciones que un cliente podría presentar durante una conversación de ventas.
+
+**Parámetros de solicitud:**
+
+```json
+{
+  "conversation_id": "string",
+  "messages": [
+    {
+      "role": "user | assistant",
+      "content": "string",
+      "timestamp": "ISO-8601 string"
+    }
+  ],
+  "customer_profile": {
+    "id": "string",
+    "demographics": { ... },
+    "purchase_history": [ ... ],
+    "preferences": { ... }
+  }
+}
+```
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "prediction_id": "string",
+    "probability": 0.75,
+    "objections": [
+      {
+        "type": "price",
+        "description": "El cliente considera que el precio es demasiado alto",
+        "confidence": 0.85,
+        "suggested_responses": [
+          "Enfatizar el valor a largo plazo",
+          "Ofrecer opciones de financiamiento"
+        ]
+      },
+      {
+        "type": "features",
+        "description": "El cliente no ve suficientes funcionalidades",
+        "confidence": 0.65,
+        "suggested_responses": [
+          "Destacar características exclusivas",
+          "Ofrecer demostración detallada"
+        ]
+      }
+    ],
+    "timestamp": "2025-05-25T20:10:30Z"
+  },
+  "error": null
+}
+```
+
+### Predicción de Necesidades
+
+#### POST /needs/predict
+
+Identifica y predice las necesidades del cliente basado en la conversación actual y su perfil.
+
+**Parámetros de solicitud:**
+
+```json
+{
+  "conversation_id": "string",
+  "messages": [
+    {
+      "role": "user | assistant",
+      "content": "string",
+      "timestamp": "ISO-8601 string"
+    }
+  ],
+  "customer_profile": {
+    "id": "string",
+    "demographics": { ... },
+    "purchase_history": [ ... ],
+    "preferences": { ... }
+  }
+}
+```
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "prediction_id": "string",
+    "needs": [
+      {
+        "category": "efficiency",
+        "description": "El cliente busca mejorar la eficiencia de sus procesos",
+        "priority": "high",
+        "confidence": 0.92,
+        "satisfaction_level": 0.3,
+        "suggested_solutions": [
+          "Presentar módulo de automatización",
+          "Compartir casos de éxito similares"
+        ]
+      },
+      {
+        "category": "cost_reduction",
+        "description": "El cliente necesita reducir costos operativos",
+        "priority": "medium",
+        "confidence": 0.78,
+        "satisfaction_level": 0.5,
+        "suggested_solutions": [
+          "Destacar ROI a corto plazo",
+          "Ofrecer plan escalonado de implementación"
+        ]
+      }
+    ],
+    "timestamp": "2025-05-25T20:11:15Z"
+  },
+  "error": null
+}
+```
+
+### Predicción de Conversión
+
+#### POST /conversion/predict
+
+Predice la probabilidad de conversión del cliente y proporciona recomendaciones para aumentarla.
+
+**Parámetros de solicitud:**
+
+```json
+{
+  "conversation_id": "string",
+  "messages": [
+    {
+      "role": "user | assistant",
+      "content": "string",
+      "timestamp": "ISO-8601 string"
+    }
+  ],
+  "customer_profile": {
+    "id": "string",
+    "demographics": { ... },
+    "purchase_history": [ ... ],
+    "preferences": { ... }
+  },
+  "product_id": "string"
+}
+```
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "prediction_id": "string",
+    "probability": 0.68,
+    "conversion_stage": "consideration",
+    "estimated_time_to_conversion": "3 days",
+    "key_factors": [
+      {
+        "factor": "product_fit",
+        "impact": 0.7,
+        "description": "El producto se ajusta bien a las necesidades expresadas"
+      },
+      {
+        "factor": "price_sensitivity",
+        "impact": -0.3,
+        "description": "El cliente muestra sensibilidad al precio"
+      }
+    ],
+    "recommendations": [
+      {
+        "action": "Ofrecer prueba gratuita",
+        "expected_impact": 0.15,
+        "priority": "high"
+      },
+      {
+        "action": "Compartir testimonios de clientes similares",
+        "expected_impact": 0.1,
+        "priority": "medium"
+      }
+    ],
+    "timestamp": "2025-05-25T20:12:00Z"
+  },
+  "error": null
+}
+```
+
+### Motor de Decisiones
+
+#### POST /decision-engine/optimize
+
+Optimiza el flujo de conversación basado en predicciones y objetivos para maximizar la probabilidad de conversión.
+
+**Parámetros de solicitud:**
+
+```json
+{
+  "conversation_id": "string",
+  "messages": [
+    {
+      "role": "user | assistant",
+      "content": "string",
+      "timestamp": "ISO-8601 string"
+    }
+  ],
+  "customer_profile": {
+    "id": "string",
+    "demographics": { ... },
+    "purchase_history": [ ... ],
+    "preferences": { ... }
+  },
+  "current_objectives": {
+    "conversion": 0.5,
+    "satisfaction": 0.3,
+    "efficiency": 0.2
+  }
+}
+```
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "prediction_id": "string",
+    "conversation_stage": "middle",
+    "next_actions": [
+      {
+        "type": "address_objection",
+        "id": "price_objection",
+        "description": "Abordar objeción de precio destacando valor a largo plazo",
+        "confidence": 0.85,
+        "priority": "high"
+      },
+      {
+        "type": "present_feature",
+        "id": "automation_feature",
+        "description": "Presentar características de automatización",
+        "confidence": 0.75,
+        "priority": "medium"
+      }
+    ],
+    "decision_tree": { ... },
+    "timestamp": "2025-05-25T20:13:30Z"
+  },
+  "error": null
+}
+```
+
+#### POST /decision-engine/adapt
+
+Adapta la estrategia de conversación en tiempo real basado en feedback del usuario.
+
+**Parámetros de solicitud:**
+
+```json
+{
+  "conversation_id": "string",
+  "messages": [
+    {
+      "role": "user | assistant",
+      "content": "string",
+      "timestamp": "ISO-8601 string"
+    }
+  ],
+  "feedback": {
+    "type": "satisfaction | objection | interest",
+    "value": 0.4,
+    "details": {
+      "objection_type": "price",
+      "category": "product_features"
+    }
+  },
+  "customer_profile": {
+    "id": "string",
+    "demographics": { ... },
+    "purchase_history": [ ... ],
+    "preferences": { ... }
+  },
+  "current_objectives": {
+    "conversion": 0.5,
+    "satisfaction": 0.3,
+    "efficiency": 0.2
+  }
+}
+```
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "prediction_id": "string",
+    "adjusted_objectives": {
+      "conversion": 0.4,
+      "satisfaction": 0.5,
+      "efficiency": 0.1
+    },
+    "next_actions": [
+      {
+        "type": "address_objection",
+        "id": "price_objection",
+        "description": "Abordar objeción de precio destacando valor a largo plazo",
+        "confidence": 0.85,
+        "priority": "high"
+      },
+      {
+        "type": "present_feature",
+        "id": "automation_feature",
+        "description": "Presentar características de automatización",
+        "confidence": 0.75,
+        "priority": "medium"
+      }
+    ],
+    "timestamp": "2025-05-25T20:14:15Z"
+  },
+  "error": null
+}
+```
+
+#### POST /decision-engine/evaluate-path
+
+Evalúa la efectividad de una ruta de conversación específica.
+
+**Parámetros de solicitud:**
+
+```json
+{
+  "conversation_id": "string",
+  "messages": [
+    {
+      "role": "user | assistant",
+      "content": "string",
+      "timestamp": "ISO-8601 string"
+    }
+  ],
+  "path_actions": [
+    {
+      "type": "address_objection",
+      "id": "price_objection",
+      "timestamp": "ISO-8601 string"
+    },
+    {
+      "type": "present_feature",
+      "id": "automation_feature",
+      "timestamp": "ISO-8601 string"
+    }
+  ],
+  "customer_profile": {
+    "id": "string",
+    "demographics": { ... },
+    "purchase_history": [ ... ],
+    "preferences": { ... }
+  }
+}
+```
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "prediction_id": "string",
+    "effectiveness": 0.72,
+    "metrics": {
+      "objection_reduction": 0.8,
+      "needs_satisfaction": 0.65,
+      "conversion_progress": 0.7,
+      "action_alignment": 0.75
+    },
+    "recommendations": [
+      {
+        "type": "need_satisfaction",
+        "description": "Satisfacer necesidad: El cliente busca más información sobre integraciones",
+        "priority": "high"
+      },
+      {
+        "type": "conversion_progression",
+        "description": "Ofrecer una demostración personalizada",
+        "priority": "medium"
+      }
+    ],
+    "timestamp": "2025-05-25T20:15:00Z"
+  },
+  "error": null
+}
+```
+
+### Estadísticas y Análisis
+
+#### GET /analytics/objections
+
+Obtiene estadísticas sobre predicciones de objeciones.
+
+**Parámetros de consulta:**
+
+- `time_period` (opcional): Período de tiempo en días (por defecto: 30)
+- `customer_segment` (opcional): Segmento de clientes para filtrar
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "accuracy": {
+      "accuracy": 0.82,
+      "precision": 0.85,
+      "recall": 0.78,
+      "f1_score": 0.81
+    },
+    "most_common_objections": [
+      {
+        "type": "price",
+        "count": 156,
+        "percentage": 42
+      },
+      {
+        "type": "features",
+        "count": 89,
+        "percentage": 24
+      }
+    ],
+    "time_series": [
+      {
+        "date": "2025-05-01",
+        "objection_count": 12,
+        "accuracy": 0.8
+      },
+      {
+        "date": "2025-05-02",
+        "objection_count": 15,
+        "accuracy": 0.83
+      }
+    ],
+    "total_predictions": 371
+  },
+  "error": null
+}
+```
+
+#### GET /analytics/needs
+
+Obtiene estadísticas sobre predicciones de necesidades.
+
+**Parámetros de consulta:**
+
+- `time_period` (opcional): Período de tiempo en días (por defecto: 30)
+- `customer_segment` (opcional): Segmento de clientes para filtrar
+
+**Respuesta exitosa:**
+
+Similar a `/analytics/objections` pero con datos específicos de necesidades.
+
+#### GET /analytics/conversion
+
+Obtiene estadísticas sobre predicciones de conversión.
+
+**Parámetros de consulta:**
+
+- `time_period` (opcional): Período de tiempo en días (por defecto: 30)
+- `customer_segment` (opcional): Segmento de clientes para filtrar
+- `product_id` (opcional): ID del producto para filtrar
+
+**Respuesta exitosa:**
+
+Similar a los endpoints anteriores pero con datos específicos de conversión.
+
+#### GET /analytics/decision-engine
+
+Obtiene estadísticas sobre el motor de decisiones.
+
+**Parámetros de consulta:**
+
+- `time_period` (opcional): Período de tiempo en días (por defecto: 30)
+
+**Respuesta exitosa:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "accuracy": {
+      "accuracy": 0.85,
+      "total_predictions": 523
+    },
+    "decision_types": {
+      "address_objection": 187,
+      "present_feature": 156,
+      "offer_discount": 92,
+      "provide_case_study": 88
+    },
+    "adaptation_rate": 0.32,
+    "effectiveness": 0.76,
+    "total_decisions": 523
+  },
+  "error": null
+}
+```
+
+## Códigos de Error
+
+| Código | Descripción |
+|---------|-------------|
+| `INVALID_REQUEST` | La solicitud contiene datos inválidos o falta información requerida |
+| `UNAUTHORIZED` | No autorizado para acceder a este recurso |
+| `RESOURCE_NOT_FOUND` | El recurso solicitado no existe |
+| `MODEL_ERROR` | Error en el modelo predictivo |
+| `RATE_LIMIT_EXCEEDED` | Se ha excedido el límite de solicitudes |
+| `INTERNAL_SERVER_ERROR` | Error interno del servidor |
+
+## Limitaciones
+
+- Máximo 10 solicitudes por segundo por cliente
+- Máximo 100,000 solicitudes por día por cliente
+- Tamaño máximo de solicitud: 1MB
+- Máximo 50 mensajes por conversación en una solicitud
+
+## Ejemplos de Uso
+
+### Ejemplo: Predecir objeciones
+
+```python
+import requests
+import json
+
+url = "https://api.ngx-sales-agent.com/predictive/objections/predict"
+headers = {
+    "Authorization": "Bearer YOUR_TOKEN",
+    "Content-Type": "application/json"
+}
+
+data = {
+    "conversation_id": "conv-12345",
+    "messages": [
+        {
+            "role": "assistant",
+            "content": "¿Qué características son más importantes para usted en un CRM?",
+            "timestamp": "2025-05-25T19:55:00Z"
+        },
+        {
+            "role": "user",
+            "content": "Necesito algo fácil de usar y que se integre con nuestras herramientas actuales. ¿Cuánto cuesta la implementación?",
+            "timestamp": "2025-05-25T19:56:30Z"
+        }
+    ],
+    "customer_profile": {
+        "id": "cust-6789",
+        "demographics": {
+            "industry": "retail",
+            "company_size": "medium"
+        }
+    }
+}
+
+response = requests.post(url, headers=headers, data=json.dumps(data))
+result = response.json()
+
+print(json.dumps(result, indent=2))
+```
 #### Predecir Objeciones
 
 ```
