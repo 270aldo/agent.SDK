@@ -6,9 +6,12 @@ predictivos del agente de ventas NGX, permitiendo programar entrenamientos,
 verificar su estado y obtener métricas de rendimiento.
 """
 
-from fastapi import APIRouter, Body, Query
+from fastapi import APIRouter, Body, Query, Depends
 from fastapi.responses import JSONResponse
 from typing import Dict, List, Any, Optional
+
+from src.auth.auth_dependencies import get_current_user, get_current_active_user, has_required_permissions, has_admin_role
+from src.auth.auth_utils import TokenData
 
 from src.integrations.supabase.resilient_client import ResilientSupabaseClient
 from src.services.predictive_model_service import PredictiveModelService
@@ -61,7 +64,8 @@ model_training_service = ModelTrainingService(supabase_client, predictive_model_
 async def schedule_model_training(
     model_name: str,
     force_training: bool = False,
-    training_config: Optional[Dict[str, Any]] = Body(None)
+    training_config: Optional[Dict[str, Any]] = Body(None),
+    current_user: TokenData = Depends(has_required_permissions(["write:models", "write:training"]))
 ) -> Dict[str, Any]:
     """
     Programa el entrenamiento de un modelo predictivo.
@@ -113,7 +117,10 @@ async def schedule_model_training(
         )
 
 @router.get("/status/{training_id}")
-async def get_training_status(training_id: str) -> Dict[str, Any]:
+async def get_training_status(
+    training_id: str,
+    current_user: TokenData = Depends(get_current_active_user)
+) -> Dict[str, Any]:
     """
     Obtiene el estado actual de un entrenamiento.
     
@@ -161,7 +168,8 @@ async def get_training_status(training_id: str) -> Dict[str, Any]:
 async def list_model_trainings(
     model_name: Optional[str] = None,
     status: Optional[str] = None,
-    limit: int = Query(10, ge=1, le=100)
+    limit: int = Query(10, ge=1, le=100),
+    current_user: TokenData = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Lista los entrenamientos de modelos con filtros opcionales.
@@ -213,7 +221,10 @@ async def list_model_trainings(
         )
 
 @router.get("/criteria/{model_name}")
-async def check_training_criteria(model_name: str) -> Dict[str, Any]:
+async def check_training_criteria(
+    model_name: str,
+    current_user: TokenData = Depends(get_current_active_user)
+) -> Dict[str, Any]:
     """
     Verifica si un modelo cumple con los criterios para ser reentrenado.
     
@@ -249,7 +260,9 @@ async def check_training_criteria(model_name: str) -> Dict[str, Any]:
         )
 
 @router.post("/auto-schedule")
-async def auto_schedule_trainings() -> Dict[str, Any]:
+async def auto_schedule_trainings(
+    current_user: TokenData = Depends(has_admin_role)
+) -> Dict[str, Any]:
     """
     Programa automáticamente el entrenamiento de todos los modelos que cumplan con los criterios.
     

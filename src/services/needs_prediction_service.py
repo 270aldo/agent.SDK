@@ -15,10 +15,15 @@ from src.integrations.supabase.resilient_client import ResilientSupabaseClient
 from src.services.predictive_model_service import PredictiveModelService
 from src.services.nlp_integration_service import NLPIntegrationService
 from src.services.entity_recognition_service import EntityRecognitionService
+from src.services.base_predictive_service import BasePredictiveService
+from src.services.utils.signal_detection import detect_sentiment_signals, detect_keyword_signals, detect_question_patterns
+from src.services.utils.scoring import normalize_scores, apply_weights, calculate_confidence, rank_items
+from src.services.utils.recommendations import generate_response_suggestions
+from src.services.utils.data_processing import extract_features_from_conversation
 
 logger = logging.getLogger(__name__)
 
-class NeedsPredictionService:
+class NeedsPredictionService(BasePredictiveService):
     """
     Servicio para anticipar las necesidades de los clientes.
     
@@ -43,50 +48,41 @@ class NeedsPredictionService:
             nlp_integration_service: Servicio de integración NLP
             entity_recognition_service: Servicio de reconocimiento de entidades
         """
-        self.supabase = supabase_client
-        self.predictive_model_service = predictive_model_service
-        self.nlp_service = nlp_integration_service
+        super().__init__(
+            supabase_client=supabase_client,
+            predictive_model_service=predictive_model_service,
+            nlp_integration_service=nlp_integration_service,
+            model_name="needs_prediction_model",
+            model_type="needs"
+        )
         self.entity_service = entity_recognition_service
-        self.model_name = "needs_prediction_model"
         self._initialize_model()
         
     async def _initialize_model(self) -> None:
         """
         Inicializa el modelo de predicción de necesidades.
         """
-        try:
-            # Verificar si el modelo ya existe
-            model = await self.predictive_model_service.get_model(self.model_name)
-            
-            if not model:
-                # Crear modelo si no existe
-                model_params = {
-                    "need_categories": [
-                        "information", "pricing", "features", "support",
-                        "customization", "integration", "training", "comparison",
-                        "technical_details", "case_studies", "alternatives"
-                    ],
-                    "confidence_threshold": 0.6,
-                    "context_window": 10,  # Número de mensajes a considerar
-                    "feature_weights": {
-                        "explicit_requests": 0.5,
-                        "implicit_interests": 0.3,
-                        "question_patterns": 0.4,
-                        "entity_mentions": 0.35,
-                        "similar_profiles": 0.25
-                    }
-                }
-                
-                await self.predictive_model_service.register_model(
-                    model_name=self.model_name,
-                    model_type="needs",
-                    model_params=model_params,
-                    description="Modelo para predicción de necesidades de clientes"
-                )
-                logger.info(f"Modelo de predicción de necesidades inicializado: {self.model_name}")
-            
-        except Exception as e:
-            logger.error(f"Error al inicializar modelo de predicción de necesidades: {e}")
+        model_params = {
+            "need_categories": [
+                "information", "pricing", "features", "support",
+                "customization", "integration", "training", "comparison",
+                "technical_details", "case_studies", "alternatives"
+            ],
+            "confidence_threshold": 0.6,
+            "context_window": 10,  # Número de mensajes a considerar
+            "feature_weights": {
+                "explicit_requests": 0.5,
+                "implicit_interests": 0.3,
+                "question_patterns": 0.4,
+                "entity_mentions": 0.35,
+                "similar_profiles": 0.25
+            }
+        }
+        
+        await self.initialize_model(
+            model_params=model_params,
+            description="Modelo para predicción de necesidades de clientes"
+        )
     
     async def predict_needs(self, conversation_id: str, 
                       messages: List[Dict[str, Any]],
@@ -185,102 +181,78 @@ class NeedsPredictionService:
         Returns:
             Características extraídas para predicción
         """
-        features = {}
-        combined_text = " ".join(messages).lower()
-        
-        # 1. Detectar solicitudes explícitas
-        explicit_requests = {}
-        request_phrases = {
-            "information": ["más información", "detalles", "explícame", "quiero saber"],
-            "pricing": ["precio", "costo", "cuánto cuesta", "planes", "descuento"],
-            "features": ["características", "funcionalidades", "qué hace", "puede hacer"],
-            "support": ["soporte", "ayuda", "asistencia", "servicio al cliente"],
-            "customization": ["personalizar", "adaptar", "ajustar", "modificar"],
-            "integration": ["integrar", "conectar con", "compatible con", "funciona con"],
-            "training": ["capacitación", "entrenamiento", "aprender", "tutorial"],
-            "comparison": ["comparar", "diferencia", "versus", "mejor que"],
-            "technical_details": ["técnico", "especificaciones", "requisitos", "arquitectura"],
-            "case_studies": ["ejemplos", "casos de éxito", "testimonios", "referencias"],
-            "alternatives": ["alternativas", "opciones", "otras soluciones", "competidores"]
+        features = {
+            "explicit_requests": {},
+            "implicit_interests": {},
+            "question_patterns": {},
+            "entity_mentions": {},
+            "similar_profiles": {}
         }
         
-        for category, phrases in request_phrases.items():
-            matches = sum(1 for phrase in phrases if phrase in combined_text)
-            if matches > 0:
-                explicit_requests[category] = min(1.0, matches / 2)
-        
-        features["explicit_requests"] = explicit_requests
-        
-        # 2. Detectar intereses implícitos mediante análisis NLP
-        implicit_interests = {}
-        for message in messages:
-            nlp_analysis = await self.nlp_service.analyze_message(message)
+        try:
+            # Extraer características básicas de la conversación
+            base_features = extract_features_from_conversation(messages, customer_profile)
             
-            # Extraer palabras clave y su relevancia
-            keywords = nlp_analysis.get("keywords", [])
-            for keyword in keywords:
-                keyword_text = keyword.get("text", "").lower()
-                relevance = keyword.get("relevance", 0)
+            # Extraer solo los mensajes del cliente
+            client_messages = [msg for msg in messages if msg.get("role") == "user"]
+            client_texts = [msg.get("content", "") for msg in client_messages]
+            
+            if not client_texts:
+                return features
+            
+            # Detectar solicitudes explícitas
+            explicit_phrases = [
+                "necesito", "quiero", "busco", "me gustaría", "estoy buscando", 
+                "me interesa", "podrías darme", "me puedes dar"
+            ]
+            
+            for message in client_texts:
+                for phrase in explicit_phrases:
+                    if phrase in message.lower():
+                        # Extraer contexto alrededor de la frase
+                        start_idx = message.lower().find(phrase)
+                        context = message[start_idx:start_idx + 50].strip()
+                        features["explicit_requests"][context] = features["explicit_requests"].get(context, 0) + 1
+            
+            # Detectar patrones de preguntas usando la utilidad compartida
+            question_signals = await detect_question_patterns(client_messages)
+            for question_type, value in question_signals.items():
+                if value > 0.2:  # Umbral para considerar la señal relevante
+                    features["question_patterns"][question_type] = value
+            
+            # Detectar menciones de entidades
+            for message in client_texts:
+                entities = await self.entity_service.extract_entities(message)
                 
-                # Mapear palabras clave a categorías de interés
-                for category, phrases in request_phrases.items():
-                    if any(phrase in keyword_text for phrase in phrases):
-                        implicit_interests[category] = max(implicit_interests.get(category, 0), relevance)
-        
-        features["implicit_interests"] = implicit_interests
-        
-        # 3. Analizar patrones de preguntas
-        question_patterns = {}
-        question_indicators = ["?", "cómo", "qué", "cuándo", "dónde", "por qué", "cuánto", "cuál"]
-        
-        for message in messages:
-            # Detectar si es una pregunta
-            is_question = any(indicator in message.lower() for indicator in question_indicators) or "?" in message
+                for entity in entities:
+                    entity_type = entity.get("type")
+                    entity_text = entity.get("text")
+                    
+                    if entity_type and entity_text:
+                        key = f"{entity_type}:{entity_text}"
+                        features["entity_mentions"][key] = features["entity_mentions"].get(key, 0) + 1
             
-            if is_question:
-                # Clasificar tipo de pregunta
-                for category, phrases in request_phrases.items():
-                    if any(phrase in message.lower() for phrase in phrases):
-                        question_patterns[category] = question_patterns.get(category, 0) + 1
-        
-        # Normalizar conteos de preguntas
-        max_questions = max(question_patterns.values()) if question_patterns else 1
-        for category in question_patterns:
-            question_patterns[category] = question_patterns[category] / max_questions
-        
-        features["question_patterns"] = question_patterns
-        
-        # 4. Analizar entidades mencionadas
-        entity_mentions = {}
-        for message in messages:
-            entities = await self.entity_service.extract_entities(message)
+            # Analizar perfil del cliente para perfiles similares
+            if customer_profile:
+                # Extraer características del perfil
+                if "segment" in customer_profile:
+                    features["similar_profiles"]["segment"] = customer_profile["segment"]
+                
+                if "industry" in customer_profile:
+                    features["similar_profiles"]["industry"] = customer_profile["industry"]
+                
+                if "company_size" in customer_profile:
+                    features["similar_profiles"]["company_size"] = customer_profile["company_size"]
             
-            for entity_type, entity_list in entities.items():
-                if entity_type == "PRODUCT" or entity_type == "SERVICE":
-                    for entity in entity_list:
-                        entity_text = entity.get("text", "").lower()
-                        # Mapear entidades a categorías de necesidad
-                        for category, phrases in request_phrases.items():
-                            if any(phrase in entity_text for phrase in phrases):
-                                entity_mentions[category] = entity_mentions.get(category, 0) + 1
-        
-        # Normalizar menciones de entidades
-        max_mentions = max(entity_mentions.values()) if entity_mentions else 1
-        for category in entity_mentions:
-            entity_mentions[category] = entity_mentions[category] / max_mentions
-        
-        features["entity_mentions"] = entity_mentions
-        
-        # 5. Considerar perfil del cliente si está disponible
-        if customer_profile:
-            features["customer_profile"] = {
-                "industry": customer_profile.get("industry"),
-                "company_size": customer_profile.get("company_size"),
-                "role": customer_profile.get("role"),
-                "previous_purchases": customer_profile.get("previous_purchases", [])
-            }
-        
-        return features
+            # Integrar características básicas
+            features["conversation_metrics"] = base_features.get("conversation_features", {})
+            features["message_metrics"] = base_features.get("message_features", {})
+            
+            return features
+            
+        except Exception as e:
+            logger.error(f"Error al extraer características para predicción de necesidades: {e}")
+            return features
     
     async def _calculate_need_scores(self, features: Dict[str, Any], 
                                need_categories: List[str],
@@ -499,21 +471,6 @@ class NeedsPredictionService:
             Resultado del registro
         """
         try:
-            # Obtener predicciones previas para esta conversación
-            query = self.supabase.table("prediction_results").select("*").eq("conversation_id", conversation_id).eq("model_name", self.model_name).execute()
-            
-            if not query.data:
-                logger.warning(f"No se encontraron predicciones previas para la conversación: {conversation_id}")
-                return {}
-            
-            prediction = query.data[0]
-            prediction_id = prediction["id"]
-            prediction_data = json.loads(prediction["prediction_data"])
-            
-            # Verificar si la necesidad real coincide con la predicción
-            predicted_needs = prediction_data.get("need_categories", [])
-            was_correct = need_category in predicted_needs
-            
             # Registrar el resultado real
             actual_result = {
                 "need_category": need_category,
@@ -521,22 +478,19 @@ class NeedsPredictionService:
                 "timestamp": datetime.now().isoformat()
             }
             
-            result = await self.predictive_model_service.update_prediction_result(
-                prediction_id=prediction_id,
+            result = await self.record_actual_result(
+                conversation_id=conversation_id,
                 actual_result=actual_result,
-                was_correct=was_correct
+                was_correct=None  # Se determinará automáticamente en record_actual_result
             )
             
             # Añadir datos para entrenamiento futuro
             features = {
                 "need_description": need_description,
-                "conversation_id": conversation_id,
-                "features": prediction_data.get("features", {})
+                "conversation_id": conversation_id
             }
             
-            await self.predictive_model_service.add_training_data(
-                model_name=self.model_name,
-                data_type="needs",
+            await self.add_training_data(
                 features=features,
                 label=need_category
             )
@@ -558,18 +512,15 @@ class NeedsPredictionService:
             Estadísticas de necesidades
         """
         try:
-            # Obtener precisión del modelo
-            accuracy_stats = await self.predictive_model_service.get_model_accuracy(
-                model_name=self.model_name,
-                time_period=time_period
-            )
+            # Obtener estadísticas básicas
+            basic_stats = await self.get_statistics(time_period)
             
             # Obtener distribución de categorías de necesidades
             query = self.supabase.table("prediction_results").select("*").eq("model_name", self.model_name).eq("status", "completed").execute()
             
             if not query.data:
                 return {
-                    "accuracy": accuracy_stats,
+                    **basic_stats,
                     "needs_distribution": {},
                     "total_needs": 0
                 }
@@ -591,7 +542,7 @@ class NeedsPredictionService:
                 needs_distribution[need_category] = count / total_needs if total_needs > 0 else 0
             
             return {
-                "accuracy": accuracy_stats,
+                **basic_stats,
                 "needs_distribution": needs_distribution,
                 "total_needs": total_needs
             }

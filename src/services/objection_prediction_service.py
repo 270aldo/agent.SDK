@@ -14,10 +14,14 @@ from datetime import datetime
 from src.integrations.supabase.resilient_client import ResilientSupabaseClient
 from src.services.predictive_model_service import PredictiveModelService
 from src.services.nlp_integration_service import NLPIntegrationService
+from src.services.base_predictive_service import BasePredictiveService
+from src.services.utils.signal_detection import detect_sentiment_signals, detect_keyword_signals, detect_question_patterns
+from src.services.utils.scoring import normalize_scores, apply_weights, calculate_confidence, rank_items
+from src.services.utils.recommendations import generate_response_suggestions
 
 logger = logging.getLogger(__name__)
 
-class ObjectionPredictionService:
+class ObjectionPredictionService(BasePredictiveService):
     """
     Servicio para predecir posibles objeciones de clientes durante conversaciones de ventas.
     
@@ -40,49 +44,40 @@ class ObjectionPredictionService:
             predictive_model_service: Servicio base para modelos predictivos
             nlp_integration_service: Servicio de integración NLP
         """
-        self.supabase = supabase_client
-        self.predictive_model_service = predictive_model_service
-        self.nlp_service = nlp_integration_service
-        self.model_name = "objection_prediction_model"
+        super().__init__(
+            supabase_client=supabase_client,
+            predictive_model_service=predictive_model_service,
+            nlp_integration_service=nlp_integration_service,
+            model_name="objection_prediction_model",
+            model_type="objection"
+        )
         self._initialize_model()
         
     async def _initialize_model(self) -> None:
         """
         Inicializa el modelo de predicción de objeciones.
         """
-        try:
-            # Verificar si el modelo ya existe
-            model = await self.predictive_model_service.get_model(self.model_name)
-            
-            if not model:
-                # Crear modelo si no existe
-                model_params = {
-                    "objection_types": [
-                        "price", "value", "need", "urgency", "authority", 
-                        "trust", "competition", "features", "implementation", 
-                        "support", "compatibility"
-                    ],
-                    "confidence_threshold": 0.65,
-                    "context_window": 5,  # Número de mensajes a considerar para contexto
-                    "signal_weights": {
-                        "sentiment_negative": 0.3,
-                        "hesitation_words": 0.2,
-                        "comparison_phrases": 0.25,
-                        "price_mentions": 0.4,
-                        "uncertainty_phrases": 0.3
-                    }
-                }
-                
-                await self.predictive_model_service.register_model(
-                    model_name=self.model_name,
-                    model_type="objection",
-                    model_params=model_params,
-                    description="Modelo para predicción de objeciones de clientes"
-                )
-                logger.info(f"Modelo de predicción de objeciones inicializado: {self.model_name}")
-            
-        except Exception as e:
-            logger.error(f"Error al inicializar modelo de predicción de objeciones: {e}")
+        model_params = {
+            "objection_types": [
+                "price", "value", "need", "urgency", "authority", 
+                "trust", "competition", "features", "implementation", 
+                "support", "compatibility"
+            ],
+            "confidence_threshold": 0.65,
+            "context_window": 5,  # Número de mensajes a considerar para contexto
+            "signal_weights": {
+                "sentiment_negative": 0.3,
+                "hesitation_words": 0.2,
+                "comparison_phrases": 0.25,
+                "price_mentions": 0.4,
+                "uncertainty_phrases": 0.3
+            }
+        }
+        
+        await self.initialize_model(
+            model_params=model_params,
+            description="Modelo para predicción de objeciones de clientes"
+        )
     
     async def predict_objections(self, conversation_id: str, 
                            messages: List[Dict[str, Any]],
@@ -169,7 +164,7 @@ class ObjectionPredictionService:
             logger.error(f"Error al predecir objeciones: {e}")
             return {"objections": [], "confidence": 0, "signals": {}}
     
-    async def _detect_objection_signals(self, messages: List[str], 
+    async def _detect_objection_signals(self, messages: List[Dict[str, Any]], 
                                   signal_weights: Dict[str, float]) -> Dict[str, float]:
         """
         Detecta señales de posibles objeciones en los mensajes.
@@ -181,56 +176,38 @@ class ObjectionPredictionService:
         Returns:
             Diccionario con señales detectadas y sus intensidades
         """
-        signals = {}
-        combined_text = " ".join(messages).lower()
-        
-        # Analizar sentimiento
-        for message in messages:
-            nlp_analysis = await self.nlp_service.analyze_message(message)
-            sentiment = nlp_analysis.get("sentiment", {}).get("score", 0)
+        try:
+            # Extraer solo los mensajes del cliente
+            client_messages = [msg for msg in messages if msg.get("role") == "user"]
             
-            # Detectar sentimiento negativo
-            if sentiment < -0.2:
-                signals["sentiment_negative"] = abs(sentiment)
-        
-        # Detectar palabras de duda/hesitación
-        hesitation_words = ["quizás", "tal vez", "no estoy seguro", "tengo dudas", 
-                           "necesito pensar", "no sé si", "me preocupa"]
-        hesitation_count = sum(1 for word in hesitation_words if word in combined_text)
-        if hesitation_count > 0:
-            signals["hesitation_words"] = min(1.0, hesitation_count / 3)
-        
-        # Detectar frases de comparación
-        comparison_phrases = ["mejor que", "comparado con", "a diferencia de", 
-                             "más barato", "más caro", "competidor", "alternativa"]
-        comparison_count = sum(1 for phrase in comparison_phrases if phrase in combined_text)
-        if comparison_count > 0:
-            signals["comparison_phrases"] = min(1.0, comparison_count / 2)
-        
-        # Detectar menciones de precio
-        price_phrases = ["precio", "costo", "caro", "barato", "presupuesto", 
-                        "inversión", "gasto", "pagar", "euros", "dólares", "pesos"]
-        price_count = sum(1 for phrase in price_phrases if phrase in combined_text)
-        if price_count > 0:
-            signals["price_mentions"] = min(1.0, price_count / 2)
-        
-        # Detectar frases de incertidumbre
-        uncertainty_phrases = ["no estoy convencido", "tendría que consultar", 
-                              "no es lo que esperaba", "no cumple", "me falta", 
-                              "necesito más información"]
-        uncertainty_count = sum(1 for phrase in uncertainty_phrases if phrase in combined_text)
-        if uncertainty_count > 0:
-            signals["uncertainty_phrases"] = min(1.0, uncertainty_count / 2)
-        
-        # Aplicar pesos a las señales
-        weighted_signals = {}
-        for signal, value in signals.items():
-            if signal in signal_weights:
-                weighted_signals[signal] = value * signal_weights[signal]
-            else:
-                weighted_signals[signal] = value * 0.1  # Peso por defecto
-        
-        return weighted_signals
+            if not client_messages:
+                return {}
+            
+            # Detectar señales de sentimiento
+            sentiment_signals = await detect_sentiment_signals(client_messages, self.nlp_service)
+            
+            # Detectar señales de palabras clave
+            keyword_signals = await detect_keyword_signals(client_messages, {
+                "hesitation_words": ["pero", "sin embargo", "aunque", "no estoy seguro", "tal vez", "quizás", "demasiado", "caro", "complicado"],
+                "comparison_phrases": ["otra opción", "competencia", "alternativa", "mejor oferta", "más barato", "más económico", "comparando"],
+                "price_mentions": ["precio", "costo", "tarifa", "pago", "inversión", "descuento", "oferta", "presupuesto", "$", "euros", "pesos"],
+                "uncertainty_phrases": ["no estoy convencido", "tengo que pensarlo", "consultarlo", "no estoy seguro", "duda", "preocupa", "problema"]
+            })
+            
+            # Detectar patrones de preguntas
+            question_signals = await detect_question_patterns(client_messages)
+            
+            # Combinar todas las señales
+            signals = {**sentiment_signals, **keyword_signals, **question_signals}
+            
+            # Aplicar pesos a las señales
+            weighted_signals = apply_weights(signals, signal_weights)
+            
+            return weighted_signals
+            
+        except Exception as e:
+            logger.error(f"Error al detectar señales de objeción: {e}")
+            return {}
     
     async def _calculate_objection_scores(self, signals: Dict[str, float], 
                                     objection_types: List[str],
@@ -380,21 +357,6 @@ class ObjectionPredictionService:
             Resultado del registro
         """
         try:
-            # Obtener predicciones previas para esta conversación
-            query = self.supabase.table("prediction_results").select("*").eq("conversation_id", conversation_id).eq("model_name", self.model_name).execute()
-            
-            if not query.data:
-                logger.warning(f"No se encontraron predicciones previas para la conversación: {conversation_id}")
-                return {}
-            
-            prediction = query.data[0]
-            prediction_id = prediction["id"]
-            prediction_data = json.loads(prediction["prediction_data"])
-            
-            # Verificar si la objeción real coincide con la predicción
-            predicted_objections = prediction_data.get("objection_types", [])
-            was_correct = objection_type in predicted_objections
-            
             # Registrar el resultado real
             actual_result = {
                 "objection_type": objection_type,
@@ -402,22 +364,19 @@ class ObjectionPredictionService:
                 "timestamp": datetime.now().isoformat()
             }
             
-            result = await self.predictive_model_service.update_prediction_result(
-                prediction_id=prediction_id,
+            result = await self.record_actual_result(
+                conversation_id=conversation_id,
                 actual_result=actual_result,
-                was_correct=was_correct
+                was_correct=None  # Se determinará automáticamente en record_actual_result
             )
             
             # Añadir datos para entrenamiento futuro
             features = {
                 "objection_text": objection_text,
-                "conversation_id": conversation_id,
-                "signals": prediction_data.get("signals", {})
+                "conversation_id": conversation_id
             }
             
-            await self.predictive_model_service.add_training_data(
-                model_name=self.model_name,
-                data_type="objection",
+            await self.add_training_data(
                 features=features,
                 label=objection_type
             )
@@ -439,18 +398,15 @@ class ObjectionPredictionService:
             Estadísticas de objeciones
         """
         try:
-            # Obtener precisión del modelo
-            accuracy_stats = await self.predictive_model_service.get_model_accuracy(
-                model_name=self.model_name,
-                time_period=time_period
-            )
+            # Obtener estadísticas básicas
+            basic_stats = await self.get_statistics(time_period)
             
             # Obtener distribución de tipos de objeciones
             query = self.supabase.table("prediction_results").select("*").eq("model_name", self.model_name).eq("status", "completed").execute()
             
             if not query.data:
                 return {
-                    "accuracy": accuracy_stats,
+                    **basic_stats,
                     "objection_distribution": {},
                     "total_objections": 0
                 }
@@ -472,7 +428,7 @@ class ObjectionPredictionService:
                 objection_distribution[objection_type] = count / total_objections if total_objections > 0 else 0
             
             return {
-                "accuracy": accuracy_stats,
+                **basic_stats,
                 "objection_distribution": objection_distribution,
                 "total_objections": total_objections
             }

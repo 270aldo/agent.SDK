@@ -5,9 +5,19 @@ Esta API expone los servicios de predicción de objeciones, necesidades,
 conversión y el motor de decisiones para optimizar las conversaciones de ventas.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Body, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
+from typing import Dict, List, Any, Optional
+
+from src.api.models.predictive_models import (
+    ObjectionPredictionRequest, ObjectionRecord,
+    NeedsPredictionRequest, NeedRecord,
+    ConversionPredictionRequest, ConversionRecord,
+    OptimizeFlowRequest, AdaptStrategyRequest, EvaluatePathRequest,
+    FeedbackRequest, ModelUpdate
+)
+from src.auth.auth_dependencies import get_current_user, get_current_active_user, has_required_permissions
+from src.auth.auth_utils import TokenData
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
@@ -92,11 +102,10 @@ decision_engine_service = DecisionEngineService(
 )
 
 # Rutas para predicción de objeciones
-@router.post("/objections/predict")
+@router.post("/objection/predict")
 async def predict_objections(
-    conversation_id: str,
-    messages: List[Dict[str, Any]] = Body(...),
-    customer_profile: Optional[Dict[str, Any]] = Body(None)
+    request: ObjectionPredictionRequest,
+    current_user: TokenData = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Predice posibles objeciones basadas en la conversación actual.
@@ -111,9 +120,9 @@ async def predict_objections(
     """
     try:
         prediction = await objection_prediction_service.predict_objections(
-            conversation_id=conversation_id,
-            messages=messages,
-            customer_profile=customer_profile
+            conversation_id=request.conversation_id,
+            messages=[message.dict() for message in request.messages],
+            customer_profile=request.customer_profile.dict() if request.customer_profile else None
         )
         
         return {
@@ -134,11 +143,10 @@ async def predict_objections(
             }
         )
 
-@router.post("/objections/record")
+@router.post("/objection/record")
 async def record_objection(
-    conversation_id: str,
-    objection_type: str = Body(...),
-    objection_text: str = Body(...)
+    objection: ObjectionRecord,
+    current_user: TokenData = Depends(has_required_permissions(["write:objections"]))
 ) -> Dict[str, Any]:
     """
     Registra una objeción real para mejorar el modelo.
@@ -152,10 +160,10 @@ async def record_objection(
         Dict: Resultado del registro
     """
     try:
-        result = await objection_prediction_service.record_actual_objection(
-            conversation_id=conversation_id,
-            objection_type=objection_type,
-            objection_text=objection_text
+        result = await objection_prediction_service.record_objection(
+            conversation_id=objection.conversation_id,
+            objection_type=objection.objection_type,
+            objection_text=objection.objection_text
         )
         
         return {
@@ -176,43 +184,11 @@ async def record_objection(
             }
         )
 
-@router.get("/objections/statistics")
-async def get_objection_statistics(time_period: Optional[int] = None) -> Dict[str, Any]:
-    """
-    Obtiene estadísticas sobre objeciones detectadas.
-    
-    Args:
-        time_period: Período de tiempo en días (opcional)
-        
-    Returns:
-        Dict: Estadísticas de objeciones
-    """
-    try:
-        statistics = await objection_prediction_service.get_objection_statistics(time_period)
-        return {
-            "success": True,
-            "data": statistics,
-            "error": None
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "success": False,
-                "data": None,
-                "error": {
-                    "code": "INTERNAL_SERVER_ERROR",
-                    "message": f"Error al obtener estadísticas: {str(e)}"
-                }
-            }
-        )
-
 # Rutas para predicción de necesidades
 @router.post("/needs/predict")
 async def predict_needs(
-    conversation_id: str,
-    messages: List[Dict[str, Any]] = Body(...),
-    customer_profile: Optional[Dict[str, Any]] = Body(None)
+    request: NeedsPredictionRequest,
+    current_user: TokenData = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Predice las necesidades del cliente basándose en la conversación actual.
@@ -227,9 +203,9 @@ async def predict_needs(
     """
     try:
         prediction = await needs_prediction_service.predict_needs(
-            conversation_id=conversation_id,
-            messages=messages,
-            customer_profile=customer_profile
+            conversation_id=request.conversation_id,
+            messages=[message.dict() for message in request.messages],
+            customer_profile=request.customer_profile.dict() if request.customer_profile else None
         )
         
         return {
@@ -252,9 +228,8 @@ async def predict_needs(
 
 @router.post("/needs/record")
 async def record_need(
-    conversation_id: str,
-    need_category: str = Body(...),
-    need_description: str = Body(...)
+    need: NeedRecord,
+    current_user: TokenData = Depends(has_required_permissions(["write:needs"]))
 ) -> Dict[str, Any]:
     """
     Registra una necesidad real para mejorar el modelo.
@@ -268,10 +243,10 @@ async def record_need(
         Dict: Resultado del registro
     """
     try:
-        result = await needs_prediction_service.record_actual_need(
-            conversation_id=conversation_id,
-            need_category=need_category,
-            need_description=need_description
+        result = await needs_prediction_service.record_need(
+            conversation_id=need.conversation_id,
+            need_category=need.need_category,
+            need_description=need.need_description
         )
         
         return {
@@ -292,43 +267,11 @@ async def record_need(
             }
         )
 
-@router.get("/needs/statistics")
-async def get_needs_statistics(time_period: Optional[int] = None) -> Dict[str, Any]:
-    """
-    Obtiene estadísticas sobre necesidades detectadas.
-    
-    Args:
-        time_period: Período de tiempo en días (opcional)
-        
-    Returns:
-        Dict: Estadísticas de necesidades
-    """
-    try:
-        statistics = await needs_prediction_service.get_needs_statistics(time_period)
-        return {
-            "success": True,
-            "data": statistics,
-            "error": None
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "success": False,
-                "data": None,
-                "error": {
-                    "code": "INTERNAL_SERVER_ERROR",
-                    "message": f"Error al obtener estadísticas: {str(e)}"
-                }
-            }
-        )
-
 # Rutas para predicción de conversión
 @router.post("/conversion/predict")
 async def predict_conversion(
-    conversation_id: str,
-    messages: List[Dict[str, Any]] = Body(...),
-    customer_profile: Optional[Dict[str, Any]] = Body(None)
+    request: ConversionPredictionRequest,
+    current_user: TokenData = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Predice la probabilidad de conversión basada en la conversación actual.
@@ -343,9 +286,10 @@ async def predict_conversion(
     """
     try:
         prediction = await conversion_prediction_service.predict_conversion(
-            conversation_id=conversation_id,
-            messages=messages,
-            customer_profile=customer_profile
+            conversation_id=request.conversation_id,
+            messages=[message.dict() for message in request.messages],
+            customer_profile=request.customer_profile.dict() if request.customer_profile else None,
+            product_id=request.product_id
         )
         
         return {
@@ -368,9 +312,8 @@ async def predict_conversion(
 
 @router.post("/conversion/record")
 async def record_conversion(
-    conversation_id: str,
-    did_convert: bool = Body(...),
-    conversion_details: Optional[Dict[str, Any]] = Body(None)
+    conversion: ConversionRecord,
+    current_user: TokenData = Depends(has_required_permissions(["write:conversions"]))
 ) -> Dict[str, Any]:
     """
     Registra el resultado real de conversión para mejorar el modelo.
@@ -384,10 +327,10 @@ async def record_conversion(
         Dict: Resultado del registro
     """
     try:
-        result = await conversion_prediction_service.record_actual_conversion(
-            conversation_id=conversation_id,
-            did_convert=did_convert,
-            conversion_details=conversion_details
+        result = await conversion_prediction_service.record_conversion(
+            conversation_id=conversion.conversation_id,
+            did_convert=conversion.did_convert,
+            conversion_details=conversion.conversion_details
         )
         
         return {
@@ -408,44 +351,11 @@ async def record_conversion(
             }
         )
 
-@router.get("/conversion/statistics")
-async def get_conversion_statistics(time_period: Optional[int] = None) -> Dict[str, Any]:
-    """
-    Obtiene estadísticas sobre predicciones de conversión.
-    
-    Args:
-        time_period: Período de tiempo en días (opcional)
-        
-    Returns:
-        Dict: Estadísticas de conversión
-    """
-    try:
-        statistics = await conversion_prediction_service.get_conversion_statistics(time_period)
-        return {
-            "success": True,
-            "data": statistics,
-            "error": None
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "success": False,
-                "data": None,
-                "error": {
-                    "code": "INTERNAL_SERVER_ERROR",
-                    "message": f"Error al obtener estadísticas: {str(e)}"
-                }
-            }
-        )
-
 # Rutas para motor de decisiones
-@router.post("/decision/optimize")
+@router.post("/decision/optimize-flow")
 async def optimize_conversation_flow(
-    conversation_id: str,
-    messages: List[Dict[str, Any]] = Body(...),
-    customer_profile: Optional[Dict[str, Any]] = Body(None),
-    current_objectives: Optional[Dict[str, float]] = Body(None)
+    request: OptimizeFlowRequest,
+    current_user: TokenData = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Optimiza el flujo de conversación basado en predicciones y objetivos.
@@ -461,10 +371,10 @@ async def optimize_conversation_flow(
     """
     try:
         optimized_flow = await decision_engine_service.optimize_conversation_flow(
-            conversation_id=conversation_id,
-            messages=messages,
-            customer_profile=customer_profile,
-            current_objectives=current_objectives
+            conversation_id=request.conversation_id,
+            messages=[message.dict() for message in request.messages],
+            customer_profile=request.customer_profile.dict() if request.customer_profile else None,
+            current_objectives=request.current_objectives
         )
         
         return {
@@ -485,13 +395,10 @@ async def optimize_conversation_flow(
             }
         )
 
-@router.post("/decision/adapt")
-async def adapt_strategy_realtime(
-    conversation_id: str,
-    messages: List[Dict[str, Any]] = Body(...),
-    current_strategy: Dict[str, Any] = Body(...),
-    feedback: Optional[Dict[str, Any]] = Body(None),
-    customer_profile: Optional[Dict[str, Any]] = Body(None)
+@router.post("/decision/adapt-strategy")
+async def adapt_strategy(
+    request: AdaptStrategyRequest,
+    current_user: TokenData = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Adapta la estrategia de conversación en tiempo real.
@@ -507,12 +414,12 @@ async def adapt_strategy_realtime(
         Dict: Estrategia adaptada con nuevas acciones recomendadas
     """
     try:
-        adapted_strategy = await decision_engine_service.adapt_strategy_realtime(
-            conversation_id=conversation_id,
-            messages=messages,
-            current_strategy=current_strategy,
-            feedback=feedback,
-            customer_profile=customer_profile
+        adapted_strategy = await decision_engine_service.adapt_strategy(
+            conversation_id=request.conversation_id,
+            messages=[message.dict() for message in request.messages],
+            current_strategy=request.current_strategy,
+            feedback=request.feedback,
+            customer_profile=request.customer_profile.dict() if request.customer_profile else None
         )
         
         return {
@@ -533,118 +440,11 @@ async def adapt_strategy_realtime(
             }
         )
 
-@router.post("/decision/prioritize")
-async def prioritize_objectives(
-    conversation_id: str,
-    messages: List[Dict[str, Any]] = Body(...),
-    customer_profile: Optional[Dict[str, Any]] = Body(None)
-) -> Dict[str, float]:
-    """
-    Prioriza objetivos de conversación basado en el contexto actual.
-    
-    Args:
-        conversation_id: ID de la conversación
-        messages: Lista de mensajes de la conversación
-        customer_profile: Perfil del cliente (opcional)
-        
-    Returns:
-        Dict: Objetivos priorizados con sus pesos
-    """
-    try:
-        priorities = await decision_engine_service.prioritize_objectives(
-            conversation_id=conversation_id,
-            messages=messages,
-            customer_profile=customer_profile
-        )
-        
-        return priorities
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al priorizar objetivos: {str(e)}")
-
-@router.post("/decision/evaluate")
-async def evaluate_conversation_path(
-    conversation_id: str,
-    messages: List[Dict[str, Any]] = Body(...),
-    path_actions: List[Dict[str, Any]] = Body(...),
-    customer_profile: Optional[Dict[str, Any]] = Body(None)
-) -> Dict[str, Any]:
-    """
-    Evalúa la efectividad de una ruta de conversación específica.
-    
-    Args:
-        conversation_id: ID de la conversación
-        messages: Lista de mensajes de la conversación
-        path_actions: Acciones tomadas en la ruta a evaluar
-        customer_profile: Perfil del cliente (opcional)
-        
-    Returns:
-        Dict: Evaluación de la ruta con métricas de efectividad
-    """
-    try:
-        evaluation = await decision_engine_service.evaluate_conversation_path(
-            conversation_id=conversation_id,
-            messages=messages,
-            path_actions=path_actions,
-            customer_profile=customer_profile
-        )
-        
-        return {
-            "success": True,
-            "data": evaluation,
-            "error": None
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "success": False,
-                "data": None,
-                "error": {
-                    "code": "MODEL_ERROR",
-                    "message": f"Error al evaluar ruta: {str(e)}"
-                }
-            }
-        )
-
-@router.get("/decision/statistics")
-async def get_decision_statistics(time_period: Optional[int] = None) -> Dict[str, Any]:
-    """
-    Obtiene estadísticas sobre decisiones tomadas por el motor.
-    
-    Args:
-        time_period: Período de tiempo en días (opcional)
-        
-    Returns:
-        Dict: Estadísticas de decisiones
-    """
-    try:
-        statistics = await decision_engine_service.get_decision_statistics(time_period)
-        return {
-            "success": True,
-            "data": statistics,
-            "error": None
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "success": False,
-                "data": None,
-                "error": {
-                    "code": "INTERNAL_SERVER_ERROR",
-                    "message": f"Error al obtener estadísticas: {str(e)}"
-                }
-            }
-        )
-
 # Rutas para retroalimentación de modelos
 @router.post("/feedback")
-async def submit_model_feedback(
-    conversation_id: str,
-    model_type: str = Body(...),
-    prediction_id: str = Body(...),
-    feedback_rating: float = Body(...),
-    feedback_details: Optional[Dict[str, Any]] = Body(None)
+async def submit_feedback(
+    feedback: FeedbackRequest,
+    current_user: TokenData = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Registra retroalimentación sobre una predicción para mejorar el modelo.
@@ -662,13 +462,13 @@ async def submit_model_feedback(
     try:
         # Seleccionar el servicio adecuado según el tipo de modelo
         service = None
-        if model_type == "objection":
+        if feedback.model_type == "objection":
             service = objection_prediction_service
-        elif model_type == "needs":
+        elif feedback.model_type == "needs":
             service = needs_prediction_service
-        elif model_type == "conversion":
+        elif feedback.model_type == "conversion":
             service = conversion_prediction_service
-        elif model_type == "decision_engine":
+        elif feedback.model_type == "decision_engine":
             service = decision_engine_service
         else:
             return JSONResponse(
@@ -678,21 +478,21 @@ async def submit_model_feedback(
                     "data": None,
                     "error": {
                         "code": "INVALID_REQUEST",
-                        "message": f"Tipo de modelo '{model_type}' no válido"
+                        "message": f"Tipo de modelo '{feedback.model_type}' no válido"
                     }
                 }
             )
         
         # Registrar retroalimentación
         result = await service.log_feedback(
-            conversation_id=conversation_id,
-            prediction_id=prediction_id,
-            feedback_rating=feedback_rating,
-            feedback_details=feedback_details
+            conversation_id=feedback.conversation_id,
+            prediction_id=feedback.prediction_id,
+            feedback_rating=feedback.feedback_rating,
+            feedback_details=feedback.feedback_details
         )
         
         # Actualizar métricas del modelo
-        await service._update_feedback_metrics(feedback_rating, feedback_details)
+        await service._update_feedback_metrics(feedback.feedback_rating, feedback.feedback_details)
         
         return {
             "success": True,
@@ -712,62 +512,12 @@ async def submit_model_feedback(
             }
         )
 
-@router.get("/feedback/statistics")
-async def get_feedback_statistics(
-    model_type: Optional[str] = None,
-    time_period: Optional[int] = None
-) -> Dict[str, Any]:
-    """
-    Obtiene estadísticas sobre la retroalimentación de los modelos.
-    
-    Args:
-        model_type: Tipo de modelo para filtrar (opcional)
-        time_period: Período de tiempo en días (opcional)
-        
-    Returns:
-        Dict: Estadísticas de retroalimentación
-    """
-    try:
-        # Obtener estadísticas de todos los servicios
-        statistics = {}
-        
-        if model_type is None or model_type == "objection":
-            objection_stats = await objection_prediction_service.get_feedback_statistics(time_period)
-            statistics["objection"] = objection_stats
-        
-        if model_type is None or model_type == "needs":
-            needs_stats = await needs_prediction_service.get_feedback_statistics(time_period)
-            statistics["needs"] = needs_stats
-        
-        if model_type is None or model_type == "conversion":
-            conversion_stats = await conversion_prediction_service.get_feedback_statistics(time_period)
-            statistics["conversion"] = conversion_stats
-        
-        if model_type is None or model_type == "decision_engine":
-            decision_stats = await decision_engine_service.get_feedback_statistics(time_period)
-            statistics["decision_engine"] = decision_stats
-        
-        return {
-            "success": True,
-            "data": statistics,
-            "error": None
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "success": False,
-                "data": None,
-                "error": {
-                    "code": "INTERNAL_SERVER_ERROR",
-                    "message": f"Error al obtener estadísticas de retroalimentación: {str(e)}"
-                }
-            }
-        )
-
 # Rutas para gestión de modelos predictivos
 @router.get("/models")
-async def list_models(model_type: Optional[str] = None) -> List[Dict[str, Any]]:
+async def list_models(
+    model_type: Optional[str] = None,
+    current_user: TokenData = Depends(get_current_active_user)
+) -> List[Dict[str, Any]]:
     """
     Lista todos los modelos predictivos registrados.
     
@@ -797,19 +547,22 @@ async def list_models(model_type: Optional[str] = None) -> List[Dict[str, Any]]:
             }
         )
 
-@router.get("/models/{model_name}")
-async def get_model(model_name: str) -> Dict[str, Any]:
+@router.get("/models/{model_id}")
+async def get_model(
+    model_id: str,
+    current_user: TokenData = Depends(get_current_active_user)
+) -> Dict[str, Any]:
     """
     Obtiene información de un modelo predictivo.
     
     Args:
-        model_name: Nombre del modelo a obtener
+        model_id: ID del modelo a obtener
         
     Returns:
         Dict: Información del modelo
     """
     try:
-        model = await predictive_model_service.get_model(model_name)
+        model = await predictive_model_service.get_model(model_id)
         
         if not model:
             return JSONResponse(
@@ -819,7 +572,7 @@ async def get_model(model_name: str) -> Dict[str, Any]:
                     "data": None,
                     "error": {
                         "code": "RESOURCE_NOT_FOUND",
-                        "message": f"Modelo '{model_name}' no encontrado"
+                        "message": f"Modelo '{model_id}' no encontrado"
                     }
                 }
             )
@@ -842,18 +595,17 @@ async def get_model(model_name: str) -> Dict[str, Any]:
             }
         )
 
-@router.put("/models/{model_name}")
+@router.put("/models/{model_id}")
 async def update_model(
-    model_name: str,
-    model_params: Optional[Dict[str, Any]] = Body(None),
-    status: Optional[str] = Body(None),
-    accuracy: Optional[float] = Body(None)
+    model_id: str,
+    model_update: ModelUpdate,
+    current_user: TokenData = Depends(has_required_permissions(["write:models"]))
 ) -> Dict[str, Any]:
     """
     Actualiza un modelo predictivo existente.
     
     Args:
-        model_name: Nombre del modelo a actualizar
+        model_id: ID del modelo a actualizar
         model_params: Nuevos parámetros del modelo (opcional)
         status: Nuevo estado del modelo (opcional)
         accuracy: Nueva precisión del modelo (opcional)
@@ -862,7 +614,7 @@ async def update_model(
         Dict: Información actualizada del modelo
     """
     try:
-        model = await predictive_model_service.get_model(model_name)
+        model = await predictive_model_service.get_model(model_id)
         
         if not model:
             return JSONResponse(
@@ -872,16 +624,16 @@ async def update_model(
                     "data": None,
                     "error": {
                         "code": "RESOURCE_NOT_FOUND",
-                        "message": f"Modelo '{model_name}' no encontrado"
+                        "message": f"Modelo '{model_id}' no encontrado"
                     }
                 }
             )
         
         updated_model = await predictive_model_service.update_model(
-            model_name=model_name,
-            model_params=model_params,
-            status=status,
-            accuracy=accuracy
+            model_id=model_id,
+            model_params=model_update.model_params,
+            status=model_update.status,
+            accuracy=model_update.accuracy
         )
         
         return {
