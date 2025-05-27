@@ -1,32 +1,20 @@
-import os
 import re
-from dotenv import load_dotenv
-from supabase import create_client, Client
+# import os # os might still be needed for other things, but not for getenv for these vars
+from supabase import create_client, Client # Keep Client if used by mock
 import logging
-import json
-from typing import Dict, Any, Optional
-from collections import defaultdict
-import uuid
+import json # Keep json if used by mock
+from typing import Dict, Any, Optional # Keep typing if used by mock
+from collections import defaultdict # Keep defaultdict if used by mock
+import uuid # Keep uuid if used by mock
+
+from src.config import settings # Importar la configuración centralizada
 
 # Configurar logging
 logger = logging.getLogger(__name__)
 
-# Cargar variables de entorno
-load_dotenv()
+# load_dotenv() is no longer needed here; Pydantic handles .env loading.
 
-# Función para leer variables directamente del archivo .env
-def read_env_file(var_name, default=""):
-    """Lee una variable directamente del archivo .env"""
-    try:
-        with open(".env", "r") as f:
-            content = f.read()
-            pattern = fr"{var_name}=(.*?)($|\n)"
-            match = re.search(pattern, content)
-            if match:
-                return match.group(1).strip()
-    except Exception as e:
-        logger.error(f"Error al leer variable {var_name} del archivo .env: {e}")
-    return default
+# read_env_file function is no longer needed.
 
 class MockSupabaseClient:
     """Implementación simulada del cliente de Supabase para desarrollo/pruebas."""
@@ -115,10 +103,10 @@ class SupabaseClient:
     
     def _initialize(self):
         """Inicializar el cliente de Supabase con credenciales desde variables de entorno o en modo simulado."""
-        # Leer las variables directamente del archivo .env
-        url = read_env_file("SUPABASE_URL", os.getenv("SUPABASE_URL", ""))
-        self.key = read_env_file("SUPABASE_ANON_KEY", os.getenv("SUPABASE_ANON_KEY", ""))
-        self.service_key = read_env_file("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""))
+        # Leer las variables desde Pydantic settings
+        url = settings.SUPABASE_URL
+        self.key = settings.SUPABASE_ANON_KEY
+        self.service_key = settings.SUPABASE_SERVICE_ROLE_KEY
         
         # Asegurar que la URL tenga el formato correcto
         if url and not url.startswith("http"):

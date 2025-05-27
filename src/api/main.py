@@ -1,17 +1,15 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-import os
 import logging
-from dotenv import load_dotenv
+# Removed os and load_dotenv imports
+
+from src.config import settings # Importar la configuración centralizada
 from .routers import conversation
 from .routers import qualification
 
-# Cargar variables de entorno
-load_dotenv()
-
-# Configurar logging
+# Configurar logging using settings
 logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
+    level=settings.LOG_LEVEL.upper(), # Use settings.LOG_LEVEL
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
@@ -20,7 +18,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="NGX Sales Agent API",
     description="API para el Agente de Ventas NGX con IA conversacional",
-    version="0.1.0",
+    version="0.1.0", # Consider updating version if significant changes
 )
 
 # Configurar CORS
@@ -46,15 +44,22 @@ async def startup_event():
     """Evento que se ejecuta al iniciar la aplicación."""
     logger.info("Iniciando aplicación NGX Sales Agent API...")
     
-    # Verificar configuración de APIs
-    required_env_vars = ["OPENAI_API_KEY", "ELEVENLABS_API_KEY", "SUPABASE_URL", "SUPABASE_ANON_KEY"]
-    missing_vars = [var for var in required_env_vars if not os.getenv(var)]
-    
-    if missing_vars:
-        logger.warning(f"Faltan variables de entorno: {', '.join(missing_vars)}")
-    else:
-        logger.info("Todas las variables de entorno requeridas están configuradas")
+    # Pydantic maneja la validación de variables de entorno al instanciar `settings`.
+    # Si falta alguna variable crítica definida en AppSettings, la aplicación
+    # no se iniciará correctamente debido a un error de validación de Pydantic.
+    logger.info("Application settings loaded and validated by Pydantic.")
 
+    if settings.DEBUG:
+        logger.debug("--- Debug Mode: Loaded Settings Overview ---")
+        logger.debug(f"Supabase URL: {settings.SUPABASE_URL}")
+        logger.debug(f"Log Level: {settings.LOG_LEVEL}")
+        # No loguear API keys completas, incluso en debug. Pydantic ya las cargó.
+        logger.debug(f"OpenAI API Key Loaded: {'Yes' if settings.OPENAI_API_KEY else 'No'}")
+        logger.debug(f"ElevenLabs API Key Loaded: {'Yes' if settings.ELEVENLABS_API_KEY else 'No'}")
+        logger.debug(f"Supabase Anon Key Loaded: {'Yes' if settings.SUPABASE_ANON_KEY else 'No'}")
+        logger.debug(f"Supabase Service Role Key Loaded: {'Yes' if settings.SUPABASE_SERVICE_ROLE_KEY else 'No'}")
+        logger.debug("-------------------------------------------")
+        
 @app.on_event("shutdown")
 async def shutdown_event():
     """Evento que se ejecuta al detener la aplicación."""

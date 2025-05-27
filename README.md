@@ -68,22 +68,12 @@ API para el Agente de Ventas NGX con IA conversacional que aprovecha OpenAI para
    LOG_LEVEL=INFO
    ```
 
-4. Configura las tablas en la base de datos de Supabase ejecutando los scripts SQL:
+4. Configura las tablas en la base de datos de Supabase ejecutando el script de configuración:
    ```bash
-   # Tablas para el sistema de calificación de leads
-   python scripts/run_qualification_migrations.py
-   
-   # Tablas para el sistema de transferencia a humanos
-   python scripts/create_human_transfer_tables.sql
-   
-   # Tablas para el sistema de seguimiento post-conversación
-   python scripts/create_follow_up_tables.sql
-   
-   # Tablas para el sistema de análisis de intención mejorado
-   python scripts/create_intent_analysis_tables.sql
+   python scripts/setup_db.py
    ```
-   
-   Alternativamente, puedes ejecutar los scripts SQL directamente en el editor SQL de Supabase.
+   Este script buscará y ejecutará automáticamente todos los archivos `.sql` que se encuentren en el directorio `scripts/`, aplicando los esquemas de base de datos necesarios.
+   Asegúrate de tener las variables de entorno de Supabase (`SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`) configuradas correctamente en tu archivo `.env`.
 
 ## Desarrollo Local
 
@@ -100,6 +90,20 @@ API para el Agente de Ventas NGX con IA conversacional que aprovecha OpenAI para
    ```bash
    uvicorn src.api.main:app --reload
    ```
+
+### Ejecución de Pruebas
+
+El proyecto utiliza `pytest` para la ejecución de pruebas automatizadas. Las pruebas se encuentran en el directorio `tests/`.
+
+Para ejecutar todas las pruebas, navega al directorio raíz del proyecto y ejecuta:
+   ```bash
+   pytest
+   ```
+   O alternativamente:
+   ```bash
+   python -m pytest
+   ```
+   Asegúrate de tener `pytest` y `pytest-asyncio` (si tienes pruebas asíncronas) instalados en tu entorno virtual (están incluidos en `requirements.txt`).
 
 ### Usando Docker
 
@@ -160,9 +164,9 @@ curl -X 'POST' \
 
 El proyecto tiene planificadas las siguientes mejoras para las próximas versiones:
 
-### Fase 1: Estabilización y Pruebas (2-3 semanas)
-- Implementación de manejo de errores robusto
-- Creación de suite de pruebas automatizadas
+### Fase 1: Estabilización y Pruebas (Completada parcialmente / En curso)
+- Implementación de manejo de errores robusto (mejorado)
+- Creación de suite de pruebas automatizadas (configurada con `pytest` y pruebas iniciales implementadas)
 - Optimización de rendimiento de operaciones existentes
 
 ### Fase 2: Mejoras en NLP y Análisis (3-4 semanas)

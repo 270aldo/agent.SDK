@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import os
+import json # Added for potential use in _get_conversation_state if raw_messages is string
 from typing import Optional, Dict, Any, Tuple, List
 from io import BytesIO
 from datetime import datetime
@@ -113,6 +114,21 @@ class ConversationService:
         logger.info(f"Conversación {state.id} iniciada para cliente {customer_data.id} con programa {program_type}")
         return state
     
+    def _extract_customer_details(self, state: ConversationState) -> tuple[str, str]:
+        """
+        Extrae el primer nombre del cliente y el género del estado de la conversación.
+        """
+        user_first_name = "Cliente"
+        customer_gender = "male" # Default gender
+
+        if state.customer_data and isinstance(state.customer_data, dict):
+            customer_gender = state.customer_data.get("gender", "male")
+            full_name = state.customer_data.get("name", "Cliente")
+            # Ensure full_name is a string before trying to split
+            user_first_name = full_name.split()[0] if full_name and isinstance(full_name, str) else "Cliente"
+        
+        return user_first_name, customer_gender
+
     async def process_message(
         self, 
         conversation_id: str, 
@@ -188,9 +204,8 @@ class ConversationService:
                 await self._save_conversation_state(state)
                 
                 # Generar audio de respuesta
-                customer_gender = "male"
-                if state.customer_data and isinstance(state.customer_data, dict):
-                    customer_gender = state.customer_data.get("gender", "male")
+                _user_first_name, customer_gender = self._extract_customer_details(state) # Use helper
+                _user_first_name, customer_gender = self._extract_customer_details(state) # Use helper
                 
                 audio_stream = await voice_engine.text_to_speech_async(
                     text=response_text,
@@ -292,9 +307,7 @@ class ConversationService:
 
         state.add_message(role="assistant", content=response_text)
         
-        customer_gender = "male"
-        if state.customer_data and isinstance(state.customer_data, dict):
-             customer_gender = state.customer_data.get("gender", "male")
+        _user_first_name, customer_gender = self._extract_customer_details(state) # Use helper
 
         audio_stream = await voice_engine.text_to_speech_async(
             text=response_text,
@@ -403,51 +416,45 @@ class ConversationService:
             
             # Si hay alta intención de compra, programar seguimiento
             if intent_analysis["has_purchase_intent"] and intent_analysis["purchase_intent_probability"] >= 0.6:
-                # Obtener nombre del usuario
-                user_name = "Cliente"
-                if state.customer_data and isinstance(state.customer_data, dict):
-                    user_name = state.customer_data.get("name", "Cliente").split()[0]
+                user_first_name, _customer_gender = self._extract_customer_details(state) # Use helper
                 
                 # Programar seguimiento para alta intención
                 follow_up = await self.follow_up_service.schedule_follow_up(
                     user_id=state.customer_id,
                     conversation_id=state.id,
                     follow_up_type="high_intent",
-                    days_delay=1  # Seguimiento al día siguiente
+                    days_delay=1,  # Seguimiento al día siguiente
+                    user_name=user_first_name # Pass the extracted first name
                 )
                 
                 logger.info(f"Seguimiento programado para conversación {state.id} con alta intención de compra")
                 
             # Si hay objeciones pero no rechazo total, programar seguimiento para manejo de objeciones
             elif intent_analysis["rejection_indicators"] and not intent_analysis["has_rejection"]:
-                # Obtener nombre del usuario
-                user_name = "Cliente"
-                if state.customer_data and isinstance(state.customer_data, dict):
-                    user_name = state.customer_data.get("name", "Cliente").split()[0]
+                user_first_name, _customer_gender = self._extract_customer_details(state) # Use helper
                 
                 # Programar seguimiento para manejo de objeciones
                 follow_up = await self.follow_up_service.schedule_follow_up(
                     user_id=state.customer_id,
                     conversation_id=state.id,
                     follow_up_type="objection_handling",
-                    days_delay=2  # Seguimiento a los 2 días
+                    days_delay=2,  # Seguimiento a los 2 días
+                    user_name=user_first_name # Pass the extracted first name
                 )
                 
                 logger.info(f"Seguimiento programado para conversación {state.id} para manejo de objeciones")
             
             # Si hubo transferencia a humano, programar seguimiento de transferencia
             elif hasattr(state, 'transfer_request_id') and state.transfer_request_id:
-                # Obtener nombre del usuario
-                user_name = "Cliente"
-                if state.customer_data and isinstance(state.customer_data, dict):
-                    user_name = state.customer_data.get("name", "Cliente").split()[0]
+                user_first_name, _customer_gender = self._extract_customer_details(state) # Use helper
                 
                 # Programar seguimiento para transferencia
                 follow_up = await self.follow_up_service.schedule_follow_up(
                     user_id=state.customer_id,
                     conversation_id=state.id,
                     follow_up_type="transfer_follow_up",
-                    days_delay=1  # Seguimiento al día siguiente
+                    days_delay=1,  # Seguimiento al día siguiente
+                    user_name=user_first_name # Pass the extracted first name
                 )
                 
                 logger.info(f"Seguimiento programado para conversación {state.id} después de transferencia a humano")
@@ -552,8 +559,11 @@ class ConversationService:
             logger.warning(f"No se encontró conversación con ID {conversation_id}")
             return None
             
+        except APIError as e: # Specific exception for PostgREST errors
+            logger.error(f"Error de API de Supabase ({type(e).__name__}) al recuperar conversación {conversation_id}: {e.message if hasattr(e, 'message') else e}")
+            return None
         except Exception as e:
-            logger.error(f"Error al recuperar conversación {conversation_id}: {e}")
+            logger.error(f"Error inesperado ({type(e).__name__}) al recuperar conversación {conversation_id}: {e}")
             return None
     
     async def _save_conversation_state(self, state: ConversationState) -> bool:
@@ -595,6 +605,9 @@ class ConversationService:
             logger.info(f"Estado de conversación {state.id} guardado correctamente")
             return True
             
+        except APIError as e: # Specific exception for PostgREST errors
+            logger.error(f"Error de API de Supabase ({type(e).__name__}) al guardar conversación {state.id}: {e.message if hasattr(e, 'message') else e}")
+            return False
         except Exception as e:
-            logger.error(f"Error al guardar conversación {state.id}: {e}")
+            logger.error(f"Error inesperado ({type(e).__name__}) al guardar conversación {state.id}: {e}")
             return False 

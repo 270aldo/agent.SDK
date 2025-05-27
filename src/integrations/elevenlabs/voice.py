@@ -1,19 +1,19 @@
-import os
 import logging
-from typing import Optional, Dict, Any, Union, BinaryIO
-from io import BytesIO
-from dotenv import load_dotenv
+from typing import Optional, Dict, Any, Union, BinaryIO # Keep typing if used by class
+from io import BytesIO # Keep BytesIO if used by class
+# from dotenv import load_dotenv # Removed
 # Importaciones correctas para la versión actual
-from elevenlabs import VoiceSettings
-from elevenlabs.client import ElevenLabs
-from enum import Enum
-import asyncio
+from elevenlabs import VoiceSettings # Keep if used by class
+from elevenlabs.client import ElevenLabs # Keep if used by class
+from enum import Enum # Keep if used by class
+import asyncio # Keep if used by class
+
+from src.config import settings # Importar la configuración centralizada
 
 # Configurar logging
 logger = logging.getLogger(__name__)
 
-# Cargar variables de entorno
-load_dotenv()
+# load_dotenv() is no longer needed here.
 
 class ProgramVoice(str, Enum):
     """Voces predefinidas para cada programa."""
@@ -44,7 +44,7 @@ class VoiceEngine:
     
     def _initialize(self):
         """Inicializar el motor de voz con la API key desde variables de entorno."""
-        self.api_key = os.getenv("ELEVENLABS_API_KEY")
+        self.api_key = settings.ELEVENLABS_API_KEY # Use settings
         self.mock_mode = False
         
         if not self.api_key:

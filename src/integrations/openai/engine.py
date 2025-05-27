@@ -1,15 +1,15 @@
-import os
 import logging
 from typing import List, Dict, Any, Optional
 from openai import AsyncOpenAI
-from dotenv import load_dotenv
-from src.models.conversation import ConversationState
+# from dotenv import load_dotenv # Removed
+from src.models.conversation import ConversationState # Keep if used by class
+
+from src.config import settings # Importar la configuración centralizada
 
 # Configurar logging
 logger = logging.getLogger(__name__)
 
-# Cargar variables de entorno
-load_dotenv()
+# load_dotenv() is no longer needed here.
 
 class ConversationEngine:
     """Motor de conversación basado en OpenAI."""
@@ -20,13 +20,15 @@ class ConversationEngine:
         
         Args:
             api_key (Optional[str]): Clave de API de OpenAI. 
-                                    Si es None, se usará OPENAI_API_KEY del entorno.
+                                    Si es None, se usará OPENAI_API_KEY de settings.
             model (str): Modelo de OpenAI a utilizar.
         """
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = api_key or settings.OPENAI_API_KEY # Use settings
         if not self.api_key:
-            logger.error("Falta variable de entorno OPENAI_API_KEY")
-            raise ValueError("Falta API key de OpenAI en variables de entorno")
+            # This error will likely be caught by Pydantic at startup if OPENAI_API_KEY is not optional in AppSettings
+            # However, keeping a runtime check here is good practice if api_key can be None through other paths.
+            logger.error("OpenAI API Key no encontrada en settings o como argumento.")
+            raise ValueError("Falta API key de OpenAI.")
             
         self.model = model
         self.client = AsyncOpenAI(api_key=self.api_key)
