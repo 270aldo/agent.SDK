@@ -1,29 +1,21 @@
 import logging
 import asyncio
 import os
+import json
 from typing import Optional, Dict, Any, Tuple, List
 from io import BytesIO
 from datetime import datetime
 import uuid
 
-# SDK de OpenAI Agents
-try:
-    from agents import Runner
-except ImportError:
-    # Si no está instalado, creamos un Runner simulado
-    class Runner:
-        @staticmethod
-        async def run(agent, messages):
-            return None
-
+# Importar nuevos sistemas de plataforma
 from src.models.conversation import ConversationState, CustomerData, Message
-# from src.integrations.openai import ConversationEngine
+from src.models.platform_context import PlatformContext, PlatformInfo, SourceType
+from src.core.agent_factory import agent_factory, AgentInterface
+from src.core.platform_config import PlatformConfigManager
+
+# Importar integraciones
 from src.integrations.elevenlabs import voice_engine
 from src.integrations.supabase import supabase_client
-from src.agents import NGXBaseAgent
-
-# Importar el agente simulado
-from src.agents.mock_agent import MockAgent, MockRunner
 
 # Importar servicios adicionales
 from src.services.intent_analysis_service import IntentAnalysisService
@@ -39,83 +31,193 @@ logger = logging.getLogger(__name__)
 
 class ConversationService:
     """
-    Servicio que integra los motores de conversación (OpenAI Agents SDK), síntesis de voz (ElevenLabs)
-    y persistencia (Supabase) para gestionar las conversaciones con clientes.
+    Servicio refactorizado que gestiona conversaciones multi-plataforma.
+    
+    Características:
+    - Soporte para múltiples puntos de contacto (web, mobile, API)
+    - Gestión robusta de agentes mediante factory pattern
+    - Configuración específica por plataforma
+    - Manejo de errores mejorado
     """
     
-    def __init__(self, industry: str = 'salud'):
+    def __init__(self, industry: str = 'salud', platform_context: Optional[PlatformContext] = None):
         """
-        Inicializar el servicio de conversación.
+        Inicializar el servicio de conversación multi-plataforma.
         
         Args:
             industry: Industria para personalizar el análisis de intención
+            platform_context: Contexto de plataforma (opcional, se puede establecer después)
         """
-        logger.info(f"Servicio de conversación inicializado para usar OpenAI Agents SDK (Industria: {industry})")
+        self.industry = industry
+        self.platform_context = platform_context
+        
+        logger.info(f"ConversationService inicializado para industria: {industry}")
         
         # Inicializar servicios adicionales
-        self.intent_analysis_service = IntentAnalysisService()  # Mantener para compatibilidad
+        self.intent_analysis_service = IntentAnalysisService()
         self.enhanced_intent_service = EnhancedIntentAnalysisService(industry=industry)
         self.qualification_service = LeadQualificationService()
         self.human_transfer_service = HumanTransferService()
         self.follow_up_service = FollowUpService()
         self.personalization_service = PersonalizationService()
-        
-        # Inicializar servicio integrado de NLP
         self.nlp_service = NLPIntegrationService()
+        
+        # Instancia de agente actual
+        self._current_agent: Optional[AgentInterface] = None
+        
+        # Verificar adaptadores disponibles
+        available_adapters = agent_factory.get_available_adapters()
+        logger.info(f"Adaptadores de agente disponibles: {available_adapters}")
     
-    async def start_conversation(self, customer_data: CustomerData, program_type: str = "PRIME") -> ConversationState:
+    async def start_conversation(
+        self, 
+        customer_data: CustomerData, 
+        program_type: str = "PRIME",
+        platform_info: Optional[PlatformInfo] = None
+    ) -> ConversationState:
         """
-        Iniciar una nueva conversación con un cliente.
+        Iniciar una nueva conversación multi-plataforma.
         
         Args:
-            customer_data (CustomerData): Datos del cliente
-            program_type (str): Tipo de programa ("PRIME" o "LONGEVITY")
+            customer_data: Datos del cliente
+            program_type: Tipo de programa ("PRIME" o "LONGEVITY")
+            platform_info: Información de la plataforma (opcional)
             
         Returns:
             ConversationState: Estado inicial de la conversación
+            
+        Raises:
+            ValueError: Si el usuario está en cooldown
+            RuntimeError: Si no se puede crear el agente
         """
-        # Verificar si el usuario ya tuvo una llamada en las últimas 48 horas
-        cooldown_status = await self.qualification_service._check_cooldown(str(customer_data.id))
-        if cooldown_status['in_cooldown']:
-            raise ValueError(f"Solo se permite una llamada cada 48 horas. Disponible en {cooldown_status['hours_remaining']} horas")
-        
-        # Crear estado inicial de la conversación
-        conversation_id = str(uuid.uuid4())
-        state = ConversationState(
-            id=conversation_id,
-            customer_id=customer_data.id,
-            program_type=program_type,
-            customer_data=customer_data.model_dump(mode='json'),
-            created_at=datetime.now(),
-            updated_at=datetime.now()
-        )
-        
-        # Registrar sesión del agente de voz
+        try:
+            # Verificar cooldown del usuario
+            cooldown_status = await self.qualification_service._check_cooldown(str(customer_data.id))
+            if cooldown_status['in_cooldown']:
+                raise ValueError(
+                    f"Solo se permite una llamada cada 48 horas. "
+                    f"Disponible en {cooldown_status['hours_remaining']} horas"
+                )
+            
+            # Establecer o crear contexto de plataforma
+            if platform_info:
+                self.platform_context = PlatformConfigManager.get_platform_config(platform_info.source)
+                self.platform_context.platform_info = platform_info
+            elif not self.platform_context:
+                # Usar configuración por defecto
+                self.platform_context = PlatformConfigManager.get_platform_config(SourceType.DIRECT_API)
+                logger.info("Usando configuración de plataforma por defecto")
+            
+            # Crear agente usando factory
+            self._current_agent = await agent_factory.create_agent(
+                platform_context=self.platform_context,
+                customer_data=customer_data
+            )
+            
+            # Crear estado inicial de la conversación
+            conversation_id = str(uuid.uuid4())
+            state = ConversationState(
+                id=conversation_id,
+                customer_id=customer_data.id,
+                program_type=program_type,
+                customer_data=customer_data.model_dump(mode='json') if hasattr(customer_data, 'model_dump') else vars(customer_data),
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            
+            # Añadir contexto de plataforma al estado
+            if hasattr(state, 'platform_context'):
+                state.platform_context = self.platform_context.to_dict()
+            
+            # Registrar sesión con configuración de plataforma
+            await self._register_session(state, customer_data, conversation_id)
+            
+            # Generar saludo personalizado por plataforma
+            greeting = await self._generate_platform_greeting(customer_data, program_type)
+            state.add_message(role="assistant", content=greeting)
+            
+            # Guardar estado inicial
+            await self._save_conversation_state(state)
+            
+            logger.info(
+                f"Conversación {state.id} iniciada para cliente {customer_data.id} "
+                f"con programa {program_type} en plataforma {self.platform_context.platform_info.source.value}"
+            )
+            
+            return state
+            
+        except Exception as e:
+            logger.error(f"Error iniciando conversación: {e}", exc_info=True)
+            raise
+    
+    async def _register_session(
+        self, 
+        state: ConversationState, 
+        customer_data: CustomerData, 
+        conversation_id: str
+    ) -> None:
+        """
+        Registrar sesión con configuración de plataforma.
+        """
         try:
             session = await self.qualification_service.register_voice_agent_session(
                 user_id=str(customer_data.id),
                 conversation_id=conversation_id
             )
             
-            # Almacenar información de la sesión en el estado
+            # Configurar sesión con valores de plataforma
             state.session_id = session.get('id')
-            state.max_duration_seconds = session.get('max_duration_seconds')
-            state.intent_detection_timeout = session.get('intent_detection_timeout')
+            state.max_duration_seconds = self.platform_context.conversation_config.max_duration_seconds
+            state.intent_detection_timeout = session.get('intent_detection_timeout', 180)
             state.session_start_time = datetime.now()
+            
         except Exception as e:
-            logger.warning(f"No se pudo registrar la sesión del agente de voz: {e}")
-            # Establecer valores por defecto
-            state.max_duration_seconds = 7 * 60  # 7 minutos
-            state.intent_detection_timeout = 3 * 60  # 3 minutos
+            logger.warning(f"No se pudo registrar sesión: {e}")
+            # Usar valores de configuración de plataforma como fallback
+            state.max_duration_seconds = self.platform_context.conversation_config.max_duration_seconds
+            state.intent_detection_timeout = 180
             state.session_start_time = datetime.now()
+    
+    async def _generate_platform_greeting(
+        self, 
+        customer_data: CustomerData, 
+        program_type: str
+    ) -> str:
+        """
+        Generar saludo personalizado por plataforma.
+        """
+        try:
+            # Usar el agente para generar el saludo
+            context = {
+                "customer_name": customer_data.name,
+                "program_type": program_type,
+                "platform_source": self.platform_context.platform_info.source.value,
+                "conversation_mode": self.platform_context.conversation_config.mode.value
+            }
+            
+            greeting_prompt = f"Genera un saludo para {customer_data.name} interesado en {program_type}"
+            greeting = await self._current_agent.process_message(greeting_prompt, context)
+            
+            return greeting
+            
+        except Exception as e:
+            logger.warning(f"Error generando saludo personalizado: {e}")
+            # Fallback a saludo genérico
+            return self._generate_greeting(customer_data, program_type)
+    
+    def set_platform_context(self, platform_context: PlatformContext) -> None:
+        """
+        Establecer contexto de plataforma para el servicio.
         
-        greeting = self._generate_greeting(customer_data, program_type)
-        state.add_message(role="assistant", content=greeting)
-        
-        await self._save_conversation_state(state)
-        
-        logger.info(f"Conversación {state.id} iniciada para cliente {customer_data.id} con programa {program_type}")
-        return state
+        Args:
+            platform_context: Nuevo contexto de plataforma
+        """
+        self.platform_context = platform_context
+        logger.info(f"Contexto de plataforma actualizado: {platform_context.platform_info.source.value}")
+    
+    def get_platform_context(self) -> Optional[PlatformContext]:
+        """Obtener contexto de plataforma actual."""
+        return self.platform_context
     
     async def process_message(
         self, 
@@ -124,231 +226,69 @@ class ConversationService:
         check_intent: bool = True
     ) -> Tuple[ConversationState, BytesIO]:
         """
-        Procesar un mensaje del cliente y generar una respuesta con audio.
+        Procesar un mensaje del cliente usando el agente multi-plataforma.
         
         Args:
-            conversation_id (str): ID de la conversación
-            message_text (str): Mensaje del cliente (solo el texto)
+            conversation_id: ID de la conversación
+            message_text: Mensaje del cliente
+            check_intent: Si verificar intención y transferencias
             
         Returns:
             Tuple[ConversationState, BytesIO]: Estado actualizado y audio de respuesta
+            
+        Raises:
+            ValueError: Si no se encuentra la conversación
+            RuntimeError: Si hay error procesando el mensaje
         """
-        state = await self._get_conversation_state(conversation_id)
-        if not state:
-            logger.error(f"No se encontró conversación con ID {conversation_id}")
-            raise ValueError(f"No se encontró conversación con ID {conversation_id}")
-        
-        state.add_message(role="user", content=message_text)
-        
-        # Analizar intención de compra con el servicio mejorado
-        enhanced_intent_analysis = self.enhanced_intent_service.analyze_purchase_intent(state.get_formatted_message_history())
-        logger.info(f"Análisis mejorado de intención para conversación {conversation_id}: {enhanced_intent_analysis}")
-        
-        # Guardar resultados del análisis en Supabase para aprendizaje continuo
         try:
-            analysis_data = {
-                "conversation_id": conversation_id,
-                "user_id": state.customer_id,
-                "purchase_intent_probability": enhanced_intent_analysis["purchase_intent_probability"],
-                "has_purchase_intent": enhanced_intent_analysis["has_purchase_intent"],
-                "has_rejection": enhanced_intent_analysis["has_rejection"],
-                "intent_indicators": json.dumps(enhanced_intent_analysis["intent_indicators"]),
-                "rejection_indicators": json.dumps(enhanced_intent_analysis["rejection_indicators"]),
-                "sentiment_score": enhanced_intent_analysis["sentiment_score"],
-                "engagement_score": enhanced_intent_analysis["engagement_score"],
-                "industry": self.enhanced_intent_service.industry,
-                "model_id": self.enhanced_intent_service.intent_model.get("id")
-            }
+            # Obtener estado de la conversación
+            state = await self._get_conversation_state(conversation_id)
+            if not state:
+                logger.error(f"Conversación {conversation_id} no encontrada")
+                raise ValueError(f"Conversación {conversation_id} no encontrada")
             
-            supabase_client.table("intent_analysis_results").insert(analysis_data).execute()
+            # Añadir mensaje del usuario
+            state.add_message(role="user", content=message_text)
+            
+            # Verificar si necesitamos crear/recuperar el agente
+            if not self._current_agent:
+                await self._restore_agent_from_state(state)
+            
+            # Procesar mensaje con el agente
+            response_message = await self._process_with_agent(message_text, state)
+            
+            # Realizar análisis de intención si está habilitado
+            if check_intent:
+                await self._analyze_intent(state, conversation_id)
+                
+                # Verificar transferencia a humano
+                if await self._check_human_transfer(message_text, state, conversation_id):
+                    # La transferencia ya maneja la respuesta
+                    audio_response = await self._generate_audio(state.messages[-1].content)
+                    return state, audio_response
+            
+            # Añadir respuesta del agente
+            state.add_message(role="assistant", content=response_message)
+            
+            # Verificar si debe continuar la conversación
+            if check_intent and not await self._should_continue_conversation(state):
+                # La función ya maneja el cierre
+                audio_response = await self._generate_audio(state.messages[-1].content)
+                return state, audio_response
+            
+            # Generar audio para la respuesta
+            audio_response = await self._generate_audio(response_message)
+            
+            # Guardar estado actualizado
+            await self._save_conversation_state(state)
+            
+            logger.info(f"Mensaje procesado exitosamente para conversación {conversation_id}")
+            return state, audio_response
+            
         except Exception as e:
-            logger.error(f"Error al guardar análisis de intención: {e}")
+            logger.error(f"Error procesando mensaje en conversación {conversation_id}: {e}", exc_info=True)
+            raise RuntimeError(f"Error procesando mensaje: {str(e)}") from e
         
-        # Actualizar estado con resultados del análisis
-        state.intent_analysis_results = enhanced_intent_analysis
-        
-        # Verificar si el usuario ha solicitado hablar con un agente humano
-        transfer_requested = self.human_transfer_service.detect_transfer_request(message_text)
-        
-        if transfer_requested:
-            try:
-                logger.info(f"Usuario ha solicitado transferencia a agente humano en conversación {conversation_id}")
-                # Verificar si se necesita transferir a un humano
-                if check_intent:
-                    # Obtener insights de NLP para la conversación
-                    conversation_insights = await asyncio.to_thread(
-                        lambda: self.nlp_service.get_conversation_insights(conversation_id)
-                    )
-                    
-                    # Agregar insights de NLP a los insights de la sesión
-                    state.session_insights['nlp_insights'] = conversation_insights
-                    
-                    # Verificar transferencia usando tanto los insights tradicionales como los de NLP
-                    enhanced_insights = {
-                        **state.session_insights,
-                        'nlp_conversation_insights': conversation_insights
-                    }
-                    
-                    transfer_needed = await asyncio.to_thread(
-                        lambda: self.human_transfer_service.check_transfer_needed(enhanced_insights)
-                    )
-                    
-                    if transfer_needed['transfer_needed']:
-                        # Actualizar estado para indicar transferencia
-                        state.phase = "human_transfer"
-                        state.session_insights['human_transfer'] = transfer_needed
-                        
-                        # Generar mensaje de transferencia
-                        transfer_message = await asyncio.to_thread(
-                            lambda: self.human_transfer_service.generate_transfer_message(transfer_needed['reason'])
-                        )
-                        
-                        # Agregar mensaje al historial
-                        state.messages.append(
-                            Message(
-                                role="assistant",
-                                content=transfer_message,
-                                timestamp=datetime.now()
-                            )
-                        )
-                        
-                        # Generar audio para el mensaje de transferencia
-                        audio_response = await asyncio.to_thread(
-                            lambda: voice_engine.text_to_speech(transfer_message)
-                        )
-                        
-                        # Guardar estado actualizado
-                        await self._save_conversation_state(state)
-                        
-                        return state, audio_response
-            except Exception as e:
-                logger.error(f"Error al procesar solicitud de transferencia: {e}")
-                # Continuar con el flujo normal si hay un error
-        
-        # Verificar si debemos aplicar el corte inteligente con el servicio mejorado
-        if check_intent and hasattr(state, 'session_start_time') and hasattr(state, 'intent_detection_timeout'):
-            should_continue, end_reason = self.enhanced_intent_service.should_continue_conversation(
-                messages=state.get_formatted_message_history(),
-                session_start_time=state.session_start_time,
-                intent_detection_timeout=state.intent_detection_timeout
-            )
-            
-            if not should_continue:
-                # Actualizar estado de la sesión si existe
-                if hasattr(state, 'session_id'):
-                    try:
-                        await self.qualification_service.update_session_status(
-                            session_id=state.session_id,
-                            status='timeout',
-                            end_reason=end_reason
-                        )
-                    except Exception as e:
-                        logger.error(f"Error al actualizar estado de sesión: {e}")
-                
-                # Generar mensaje de cierre basado en la razón
-                if end_reason == 'rejection_detected':
-                    response_text = "Entiendo que no estés interesado en este momento. Gracias por tu tiempo. Si cambias de opinión o tienes alguna pregunta en el futuro, no dudes en contactarnos."
-                else:  # no_intent_detected
-                    response_text = "Parece que este no es el mejor momento para hablar sobre nuestro programa. Te enviaré más información por correo electrónico para que puedas revisarla cuando te sea conveniente. ¡Gracias por tu tiempo!"
-                
-                state.add_message(role="assistant", content=response_text)
-                state.updated_at = datetime.now()
-                await self._save_conversation_state(state)
-                
-                # Generar audio de respuesta
-                customer_gender = "male"
-                if state.customer_data and isinstance(state.customer_data, dict):
-                    customer_gender = state.customer_data.get("gender", "male")
-                
-                audio_stream = await voice_engine.text_to_speech_async(
-                    text=response_text,
-                    program_type=state.program_type,
-                    gender=customer_gender
-                )
-                
-                logger.info(f"Conversación {state.id} finalizada por corte inteligente: {end_reason}")
-                return state, audio_stream
-        
-        # Analizar mensaje con el servicio integrado de NLP
-        if check_intent:
-            # Análisis completo de NLP
-            nlp_analysis = await asyncio.to_thread(
-                lambda: self.nlp_service.analyze_message(message_text, conversation_id)
-            )
-            
-            # Análisis de intención (mantener para compatibilidad)
-            intent_analysis = await asyncio.to_thread(
-                lambda: self.enhanced_intent_service.analyze_message(message_text)
-            )
-            
-            # Actualizar insights de la sesión
-            if 'session_insights' not in state.model_dump():
-                state.session_insights = {}
-            
-            # Guardar análisis de intención (compatibilidad)
-            state.session_insights['intent_analysis'] = intent_analysis
-            
-            # Guardar análisis completo de NLP
-            state.session_insights['nlp_analysis'] = nlp_analysis
-        
-        formatted_history = state.get_formatted_message_history()
-
-        # Verificar si debemos usar el agente simulado
-        use_mock_agent = False
-        try:
-            # Intentar verificar la clave API de OpenAI
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key or api_key.startswith("sk-proj-"):
-                # Las claves que comienzan con sk-proj- son claves de proyecto y pueden requerir configuración adicional
-                # Por seguridad, usamos el agente simulado
-                logger.warning(f"Usando agente simulado para la conversación {state.id} debido a formato de clave API")
-                use_mock_agent = True
-        except Exception:
-            use_mock_agent = True
-
-        if use_mock_agent:
-            # Usar el agente simulado
-            logger.info(f"Ejecutando agente simulado NGX {state.program_type} para conversación {state.id}...")
-            try:
-                mock_agent = MockAgent(program_type=state.program_type)
-                agent_run_result = await MockRunner.run(mock_agent, formatted_history)
-                response_text = agent_run_result.final_output
-            except Exception as e:
-                logger.error(f"Error al ejecutar el agente simulado para la conversación {state.id}: {e}")
-                response_text = "Lo siento, tuve un problema al procesar tu solicitud. Por favor, inténtalo de nuevo."
-        else:
-            # Usar el agente real de OpenAI
-            agent = NGXBaseAgent(program_type=state.program_type)
-            
-            logger.info(f"Ejecutando agente NGX {state.program_type} para conversación {state.id}...")
-            try:
-                agent_run_result = await Runner.run(agent, formatted_history)
-                response_text = agent_run_result.final_output
-                
-                if response_text is None:
-                    logger.warning(f"El agente no devolvió un final_output para la conversación {state.id}. Usando respuesta por defecto.")
-                    response_text = "No estoy seguro de cómo responder a eso en este momento. ¿Podrías reformular tu pregunta?"
-
-            except Exception as e:
-                logger.error(f"Error al ejecutar el agente SDK para la conversación {state.id}: {e}")
-                response_text = "Lo siento, tuve un problema al procesar tu solicitud. Por favor, inténtalo de nuevo."
-
-        state.add_message(role="assistant", content=response_text)
-        
-        customer_gender = "male"
-        if state.customer_data and isinstance(state.customer_data, dict):
-             customer_gender = state.customer_data.get("gender", "male")
-
-        audio_stream = await voice_engine.text_to_speech_async(
-            text=response_text,
-            program_type=state.program_type,
-            gender=customer_gender
-        )
-        
-        state.updated_at = datetime.now()
-        logger.info(f"Mensaje procesado para conversación {state.id}. Respuesta: {response_text[:100]}...")
-        return state, audio_stream
-    
     async def end_conversation(self, conversation_id: str, end_reason: str = "completed") -> ConversationState:
         """
         Finalizar una conversación.
@@ -665,4 +605,217 @@ class ConversationService:
             
         except Exception as e:
             logger.error(f"Error al guardar conversación {state.id}: {e}")
-            return False 
+            return False
+    
+    async def _restore_agent_from_state(self, state: ConversationState) -> None:
+        """Restaurar agente desde el estado de la conversación."""
+        try:
+            # Restaurar contexto de plataforma si existe
+            if hasattr(state, 'platform_context') and state.platform_context:
+                self.platform_context = PlatformContext.from_dict(state.platform_context)
+            elif not self.platform_context:
+                # Usar configuración por defecto
+                self.platform_context = PlatformConfigManager.get_platform_config(SourceType.DIRECT_API)
+            
+            # Crear agente usando factory
+            customer_data = CustomerData(**state.customer_data)
+            self._current_agent = await agent_factory.create_agent(
+                platform_context=self.platform_context,
+                customer_data=customer_data
+            )
+            
+            logger.info(f"Agente restaurado para conversación {state.id}")
+            
+        except Exception as e:
+            logger.error(f"Error restaurando agente: {e}")
+            raise RuntimeError(f"No se pudo restaurar el agente: {str(e)}") from e
+    
+    async def _process_with_agent(self, message_text: str, state: ConversationState) -> str:
+        """Procesar mensaje con el agente actual."""
+        try:
+            # Preparar contexto para el agente
+            context = {
+                "conversation_id": state.id,
+                "customer_id": state.customer_id,
+                "program_type": state.program_type,
+                "conversation_history": [
+                    {"role": msg.role, "content": msg.content} 
+                    for msg in state.messages[-5:]  # Últimos 5 mensajes para contexto
+                ],
+                "platform_info": self.platform_context.platform_info.to_dict() if self.platform_context else {},
+                "conversation_config": self.platform_context.conversation_config.__dict__ if self.platform_context else {}
+            }
+            
+            # Procesar mensaje con el agente
+            response = await self._current_agent.process_message(message_text, context)
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error procesando con agente: {e}")
+            # Fallback a respuesta genérica
+            return "Lo siento, no pude procesar tu mensaje en este momento. ¿Podrías reformular tu pregunta?"
+    
+    async def _analyze_intent(self, state: ConversationState, conversation_id: str) -> None:
+        """Analizar intención de compra y guardar resultados."""
+        try:
+            # Analizar intención con el servicio mejorado
+            enhanced_intent_analysis = self.enhanced_intent_service.analyze_purchase_intent(
+                state.get_formatted_message_history()
+            )
+            
+            logger.info(f"Análisis de intención para {conversation_id}: {enhanced_intent_analysis}")
+            
+            # Guardar resultados en Supabase
+            analysis_data = {
+                "conversation_id": conversation_id,
+                "user_id": state.customer_id,
+                "purchase_intent_probability": enhanced_intent_analysis["purchase_intent_probability"],
+                "has_purchase_intent": enhanced_intent_analysis["has_purchase_intent"],
+                "has_rejection": enhanced_intent_analysis["has_rejection"],
+                "intent_indicators": json.dumps(enhanced_intent_analysis["intent_indicators"]),
+                "rejection_indicators": json.dumps(enhanced_intent_analysis["rejection_indicators"]),
+                "sentiment_score": enhanced_intent_analysis["sentiment_score"],
+                "engagement_score": enhanced_intent_analysis["engagement_score"],
+                "industry": self.enhanced_intent_service.industry,
+                "model_id": self.enhanced_intent_service.intent_model.get("id")
+            }
+            
+            supabase_client.table("intent_analysis_results").insert(analysis_data).execute()
+            
+            # Actualizar estado con resultados
+            state.intent_analysis_results = enhanced_intent_analysis
+            
+        except Exception as e:
+            logger.error(f"Error analizando intención: {e}")
+    
+    async def _check_human_transfer(
+        self, 
+        message_text: str, 
+        state: ConversationState, 
+        conversation_id: str
+    ) -> bool:
+        """Verificar si se requiere transferencia a agente humano."""
+        try:
+            # Solo verificar si está habilitado en la configuración
+            if not self.platform_context.conversation_config.enable_transfer:
+                return False
+            
+            # Detectar solicitud de transferencia
+            transfer_requested = self.human_transfer_service.detect_transfer_request(message_text)
+            
+            if transfer_requested:
+                logger.info(f"Transferencia solicitada en conversación {conversation_id}")
+                
+                # Obtener insights de NLP
+                conversation_insights = await asyncio.to_thread(
+                    lambda: self.nlp_service.get_conversation_insights(conversation_id)
+                )
+                
+                # Preparar insights combinados
+                enhanced_insights = {
+                    **state.session_insights,
+                    'nlp_conversation_insights': conversation_insights
+                }
+                
+                # Verificar si se necesita transferencia
+                transfer_needed = await asyncio.to_thread(
+                    lambda: self.human_transfer_service.check_transfer_needed(enhanced_insights)
+                )
+                
+                if transfer_needed['transfer_needed']:
+                    # Actualizar estado
+                    state.phase = "human_transfer"
+                    state.session_insights['human_transfer'] = transfer_needed
+                    
+                    # Generar mensaje de transferencia
+                    transfer_message = await asyncio.to_thread(
+                        lambda: self.human_transfer_service.generate_transfer_message(transfer_needed['reason'])
+                    )
+                    
+                    # Añadir mensaje al historial
+                    state.add_message(role="assistant", content=transfer_message)
+                    
+                    logger.info(f"Transferencia aprobada para conversación {conversation_id}")
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error verificando transferencia: {e}")
+            return False
+    
+    async def _should_continue_conversation(self, state: ConversationState) -> bool:
+        """Verificar si la conversación debe continuar."""
+        try:
+            # Verificar timeout solo si tenemos la información necesaria
+            if (hasattr(state, 'session_start_time') and 
+                hasattr(state, 'intent_detection_timeout') and 
+                state.session_start_time and state.intent_detection_timeout):
+                
+                should_continue, end_reason = self.enhanced_intent_service.should_continue_conversation(
+                    messages=state.get_formatted_message_history(),
+                    session_start_time=state.session_start_time,
+                    intent_detection_timeout=state.intent_detection_timeout
+                )
+                
+                if not should_continue:
+                    logger.info(f"Finalizando conversación {state.id}: {end_reason}")
+                    
+                    # Actualizar sesión si existe
+                    if hasattr(state, 'session_id') and state.session_id:
+                        try:
+                            await self.qualification_service.update_session_status(
+                                session_id=state.session_id,
+                                status='timeout',
+                                end_reason=end_reason
+                            )
+                        except Exception as e:
+                            logger.error(f"Error actualizando estado de sesión: {e}")
+                    
+                    # Generar mensaje de cierre
+                    closing_message = self._generate_closing_message(end_reason)
+                    state.add_message(role="assistant", content=closing_message)
+                    
+                    # Actualizar fase
+                    state.phase = "ended"
+                    state.end_reason = end_reason
+                    
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error verificando continuación de conversación: {e}")
+            return True  # En caso de error, continuar por seguridad
+    
+    async def _generate_audio(self, text: str) -> BytesIO:
+        """Generar audio para el texto dado."""
+        try:
+            # Verificar si la síntesis de voz está habilitada
+            if not self.platform_context.conversation_config.enable_voice:
+                # Retornar audio vacío si no está habilitado
+                return BytesIO()
+            
+            # Generar audio usando ElevenLabs
+            audio_response = await asyncio.to_thread(
+                lambda: voice_engine.text_to_speech(text)
+            )
+            
+            return audio_response
+            
+        except Exception as e:
+            logger.error(f"Error generando audio: {e}")
+            # Retornar audio vacío en caso de error
+            return BytesIO()
+    
+    def _generate_closing_message(self, end_reason: str) -> str:
+        """Generar mensaje de cierre basado en la razón."""
+        closing_messages = {
+            'rejection_detected': "Entiendo que no es el momento adecuado. Gracias por tu tiempo y estaremos aquí cuando estés listo.",
+            'timeout': "Ha sido un placer conversar contigo. Si tienes más preguntas, no dudes en contactarnos.",
+            'intent_achieved': "Perfecto, hemos cubierto todo lo que necesitabas. ¡Gracias por tu tiempo!",
+            'default': "Gracias por conversar con nosotros. ¡Que tengas un excelente día!"
+        }
+        
+        return closing_messages.get(end_reason, closing_messages['default']) 
