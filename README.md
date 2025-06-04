@@ -7,6 +7,9 @@ API para el Agente de Ventas NGX con IA conversacional que aprovecha OpenAI para
 ### Capacidades Principales
 - 🧠 **Procesamiento de Lenguaje Natural**: Utiliza GPT-4 para mantener conversaciones contextuales y naturales.
 - 🗣️ **Síntesis de Voz Avanzada**: Integración con ElevenLabs para generar respuestas de voz naturales y expresivas.
+- 🗨️ **Conversaciones en Tiempo Real**: Compatible con la API conversacional de
+  ElevenLabs 2.0 para iniciar sesiones de voz y enviar mensajes de manera
+  interactiva.
 - 💾 **Persistencia en Supabase**: Almacenamiento de conversaciones y datos de clientes en PostgreSQL mediante Supabase.
 - 🔄 **Arquitectura Asíncrona**: API completamente asíncrona para manejar múltiples conversaciones simultáneas.
 - 🚀 **Containerización con Docker**: Facilidad de despliegue y desarrollo mediante contenedores.
@@ -154,6 +157,18 @@ curl -X 'POST' \
   -d '{
     "message": "Me interesa mejorar mi energía durante el día."
   }'
+```
+
+### Usar ElevenLabs Conversational Engine
+
+```python
+from src.integrations.elevenlabs import ConversationalEngine
+
+engine = ConversationalEngine()
+engine.start(agent_id="YOUR_AGENT_ID")
+engine.send_message("Hola, ¿cómo estás?")
+audio = engine.get_audio()
+engine.end()
 ```
 
 ## Plan de Mejora

@@ -4,8 +4,13 @@ from typing import Optional, Dict, Any, Union, BinaryIO
 from io import BytesIO
 from dotenv import load_dotenv
 # Importaciones correctas para la versión actual
-from elevenlabs import VoiceSettings
-from elevenlabs.client import ElevenLabs
+try:
+    from elevenlabs import VoiceSettings
+    from elevenlabs.client import ElevenLabs
+except Exception as e:  # pragma: no cover - optional dependency
+    VoiceSettings = None  # type: ignore
+    ElevenLabs = None  # type: ignore
+    logging.getLogger(__name__).warning(f"ElevenLabs import failed: {e}")
 from enum import Enum
 import asyncio
 
@@ -52,20 +57,25 @@ class VoiceEngine:
             self.mock_mode = True
         
         # Configuración para voces
-        self.voice_settings = VoiceSettings(
-            stability=0.71,
-            similarity_boost=0.5,
-            style=0.0,
-            use_speaker_boost=True
-        )
+        if VoiceSettings:
+            self.voice_settings = VoiceSettings(
+                stability=0.71,
+                similarity_boost=0.5,
+                style=0.0,
+                use_speaker_boost=True,
+            )
+        else:
+            self.voice_settings = None
         
         # Inicializar cliente si no estamos en modo simulado
-        if not self.mock_mode:
+        if not self.mock_mode and ElevenLabs:
             try:
                 self.client = ElevenLabs(api_key=self.api_key)
                 logger.info("Motor de voz ElevenLabs inicializado")
             except Exception as e:
-                logger.warning(f"Error al inicializar ElevenLabs: {e} - cambiando a modo simulado")
+                logger.warning(
+                    f"Error al inicializar ElevenLabs: {e} - cambiando a modo simulado"
+                )
                 self.mock_mode = True
         
         if self.mock_mode:
@@ -113,12 +123,14 @@ class VoiceEngine:
             voice_id = self.get_voice_id(program_type, gender)
             
             # Utilizamos client.text_to_speech.convert según la API actual
+            if not self.client:
+                raise RuntimeError("ElevenLabs client not available")
             audio_generator = self.client.text_to_speech.convert(
                 voice_id=voice_id,
                 text=text,
                 model_id="eleven_multilingual_v2",
                 output_format="mp3_44100_128",
-                voice_settings=self.voice_settings
+                voice_settings=self.voice_settings,
             )
             
             # El método devuelve un generator, lo convertimos a bytes

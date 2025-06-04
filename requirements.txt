@@ -9,7 +9,7 @@ openai-agents
 langchain==0.0.312
 
 # Procesamiento de voz
-elevenlabs
+elevenlabs==2.1.0
 librosa==0.10.1
 soundfile==0.12.1
 
