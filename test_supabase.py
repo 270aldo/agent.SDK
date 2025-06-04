@@ -1,3 +1,5 @@
+import pytest
+pytest.skip("manual script", allow_module_level=True)
 import os
 import sys
 import asyncio

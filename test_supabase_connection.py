@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import pytest
+pytest.skip("manual script", allow_module_level=True)
 """
 Script para probar la conexión a Supabase directamente.
 """

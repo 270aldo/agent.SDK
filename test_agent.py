@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import pytest
+pytest.skip("manual script", allow_module_level=True)
 """
 Script para probar las capacidades del agente de ventas NGX refactorizado con SDK de OpenAI Agents.
 Permite enviar mensajes específicos y observar la respuesta del agente.
