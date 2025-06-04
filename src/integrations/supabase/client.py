@@ -103,6 +103,11 @@ class MockTableQuery:
         """Simular upsert."""
         return {"data": self.client.upsert(self.table_name, data)}
 
+    def insert(self, data):
+        """Simular inserción de datos."""
+        self.client.tables[self.table_name].append(data)
+        return {"data": data}
+
 class SupabaseClient:
     _instance = None
     _mock_enabled = False  # Cambiar a False para usar el cliente real de Supabase
