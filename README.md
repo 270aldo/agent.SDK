@@ -68,22 +68,20 @@ API para el Agente de Ventas NGX con IA conversacional que aprovecha OpenAI para
    LOG_LEVEL=INFO
    ```
 
-4. Configura las tablas en la base de datos de Supabase ejecutando los scripts SQL:
+4. Configura las tablas en la base de datos de Supabase ejecutando los scripts SQL (también puedes cargarlos manualmente desde el editor SQL de Supabase):
    ```bash
    # Tablas para el sistema de calificación de leads
-   python scripts/run_qualification_migrations.py
-   
+   psql $DATABASE_URL -f scripts/create_qualification_tables.sql
+
    # Tablas para el sistema de transferencia a humanos
-   python scripts/create_human_transfer_tables.sql
-   
+   psql $DATABASE_URL -f scripts/create_human_transfer_tables.sql
+
    # Tablas para el sistema de seguimiento post-conversación
-   python scripts/create_follow_up_tables.sql
-   
+   psql $DATABASE_URL -f scripts/create_follow_up_tables.sql
+
    # Tablas para el sistema de análisis de intención mejorado
-   python scripts/create_intent_analysis_tables.sql
+   psql $DATABASE_URL -f scripts/create_intent_analysis_tables.sql
    ```
-   
-   Alternativamente, puedes ejecutar los scripts SQL directamente en el editor SQL de Supabase.
 
 ## Desarrollo Local
 
