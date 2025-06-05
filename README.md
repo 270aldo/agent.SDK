@@ -108,6 +108,14 @@ API para el Agente de Ventas NGX con IA conversacional que aprovecha OpenAI para
    docker-compose -f docker/docker-compose.yml up --build
    ```
 
+   Para producción puedes usar la misma imagen pero sin recarga automática y con
+   múltiples procesos de trabajo:
+
+   ```bash
+   docker build -f docker/Dockerfile -t ngx-agent .
+   docker run -p 8000:8000 ngx-agent
+   ```
+
 ## API Endpoints
 
 La API estará disponible en `http://localhost:8000` con los siguientes endpoints:
