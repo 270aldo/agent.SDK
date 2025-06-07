@@ -77,7 +77,7 @@ async def test_supabase_operations():
         
         # Insertar la conversación
         conv_response = await asyncio.to_thread(
-            lambda: client.table("conversations").upsert(conversation).execute()
+            lambda: client.table("conversations").insert(conversation).execute()
         )
         logger.info(f"Conversación insertada: {conv_response.data}")
         
