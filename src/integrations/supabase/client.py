@@ -30,34 +30,48 @@ def read_env_file(var_name, default=""):
 
 class MockSupabaseClient:
     """Implementación simulada del cliente de Supabase para desarrollo/pruebas."""
-    
+
     def __init__(self):
         self.tables = defaultdict(list)
         logger.info("Cliente simulado de Supabase inicializado (MODO SIN CONEXIÓN)")
-    
+
     def table(self, table_name: str):
         """Simular acceso a tabla."""
         return MockTableQuery(self, table_name)
-    
+
+    def insert(self, table_name: str, data: Dict[str, Any]):
+        """Insertar datos en la tabla simulada."""
+        self.tables[table_name].append(data)
+        return data
+
     def upsert(self, table_name: str, data: Dict[str, Any]):
         """Guardar o actualizar datos en la tabla simulada."""
-        # Buscar registro existente por id
         record_id = data.get('id')
-        
+
         if not record_id:
             return {"error": "ID missing"}
-        
-        # Verificar si el registro ya existe
+
         for i, record in enumerate(self.tables[table_name]):
             if record.get('id') == record_id:
-                # Actualizar registro existente
                 self.tables[table_name][i] = data
-                return {"data": data}
-        
-        # Insertar nuevo registro
+                return data
+
         self.tables[table_name].append(data)
-        return {"data": data}
-    
+        return data
+
+    def update(self, table_name: str, data: Dict[str, Any], filters: Optional[Dict[str, Any]] = None):
+        """Actualizar datos en la tabla simulada."""
+        if not filters:
+            return []
+
+        updated = []
+        for record in self.tables[table_name]:
+            match = all(record.get(k) == v for k, v in filters.items())
+            if match:
+                record.update(data)
+                updated.append(record)
+        return updated
+
     def select_by_id(self, table_name: str, record_id: str):
         """Simular búsqueda por ID."""
         for record in self.tables[table_name]:
@@ -67,11 +81,13 @@ class MockSupabaseClient:
 
 class MockTableQuery:
     """Simulador de consultas a tablas de Supabase."""
-    
+
     def __init__(self, client, table_name):
         self.client = client
         self.table_name = table_name
         self._filters = []
+        self._operation = None
+        self._data = None
     
     def select(self, *fields):
         """Simular selección de campos."""
@@ -85,23 +101,46 @@ class MockTableQuery:
     def single(self):
         """Simular consulta que devuelve un único registro."""
         return self
-    
+
     def execute(self):
         """Ejecutar la consulta simulada."""
-        if not self._filters:
-            return {"data": self.client.tables[self.table_name]}
-        
-        # Aplicar filtros (simplificado - solo filtra por igualdad en id)
-        for field, op, value in self._filters:
-            if field == 'id' and op == '=':
-                return self.client.select_by_id(self.table_name, value)
-        
-        # Si no hay coincidencias
-        return {"data": None}
-    
+        if self._operation == 'insert':
+            inserted = self.client.insert(self.table_name, self._data)
+            return {"data": [inserted]}
+        elif self._operation == 'upsert':
+            upserted = self.client.upsert(self.table_name, self._data)
+            return {"data": [upserted]}
+        elif self._operation == 'update':
+            filters = {f: v for f, _, v in self._filters}
+            updated = self.client.update(self.table_name, self._data, filters)
+            return {"data": updated}
+        else:
+            if not self._filters:
+                return {"data": self.client.tables[self.table_name]}
+
+            for field, op, value in self._filters:
+                if field == 'id' and op == '=':
+                    return self.client.select_by_id(self.table_name, value)
+
+            return {"data": None}
+
     def upsert(self, data):
         """Simular upsert."""
-        return {"data": self.client.upsert(self.table_name, data)}
+        self._operation = 'upsert'
+        self._data = data
+        return self
+
+    def insert(self, data):
+        """Simular insert."""
+        self._operation = 'insert'
+        self._data = data
+        return self
+
+    def update(self, data):
+        """Simular update."""
+        self._operation = 'update'
+        self._data = data
+        return self
 
     def insert(self, data):
         """Simular inserción de datos."""
