@@ -96,6 +96,7 @@ conversion_prediction_service = ConversionPredictionService(
 decision_engine_service = DecisionEngineService(
     supabase_client,
     predictive_model_service,
+    nlp_integration_service,
     objection_prediction_service,
     needs_prediction_service,
     conversion_prediction_service

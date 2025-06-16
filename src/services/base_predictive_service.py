@@ -25,22 +25,25 @@ class BasePredictiveService:
     """
     
     def __init__(self, 
-                 supabase_client: ResilientSupabaseClient,
+                 supabase: ResilientSupabaseClient,
                  predictive_model_service: PredictiveModelService,
                  nlp_integration_service: NLPIntegrationService,
                  model_name: str,
                  model_type: str):
         """
-        Inicializa el servicio predictivo base.
-        
+        Inicializa el servicio base para modelos predictivos.
+
         Args:
-            supabase_client: Cliente de Supabase para persistencia
-            predictive_model_service: Servicio base para modelos predictivos
-            nlp_integration_service: Servicio de integración NLP
-            model_name: Nombre del modelo
-            model_type: Tipo del modelo (objection, needs, conversion, decision)
+            supabase: Cliente de Supabase para la conexión a la base de datos.
+            predictive_model_service: Instancia del servicio de modelos predictivos.
+            nlp_integration_service: Instancia del servicio de integración de NLP.
+            model_name: Nombre del modelo.
+            model_type: Tipo de modelo (ej. 'needs_prediction', 'objection_prediction').
         """
-        self.supabase = supabase_client
+        if not supabase or not predictive_model_service or not nlp_integration_service:
+            raise ValueError("Todos los servicios y el cliente de Supabase son requeridos.")
+
+        self.supabase = supabase
         self.predictive_model_service = predictive_model_service
         self.nlp_service = nlp_integration_service
         self.model_name = model_name

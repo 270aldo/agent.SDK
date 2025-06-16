@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guía Completa: 7 Errores que Arruinan Tu Progreso | NGX Lead Magnet Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.6;
+            background: #f8fafc;
+            color: #333;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+        }
+
+        .header-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 24px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        /* Lead magnet container */
+        .lead-magnet-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 24px;
+        }
+
+        /* Download success message */
+        .download-success {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1));
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 40px;
+            text-align: center;
+            animation: slideInDown 0.5s ease-out;
+        }
+
+        .success-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            color: white;
+            font-size: 24px;
+        }
+
+        .download-success h2 {
+            color: #059669;
+            margin-bottom: 8px;
+            font-size: 1.5rem;
+        }
+
+        .download-success p {
+            color: #047857;
+            font-size: 1.1rem;
+        }
+
+        /* Content sections */
+        .content-section {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 32px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .content-section h3 {
+            color: #1f2937;
+            margin-bottom: 16px;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .content-section p {
+            color: #6b7280;
+            margin-bottom: 16px;
+            line-height: 1.7;
+        }
+
+        .error-list {
+            list-style: none;
+            margin: 24px 0;
+        }
+
+        .error-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), rgba(220, 38, 38, 0.05));
+            border-left: 4px solid #ef4444;
+            border-radius: 8px;
+        }
+
+        .error-number {
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .error-content h4 {
+            color: #dc2626;
+            margin-bottom: 4px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .error-content p {
+            color: #991b1b;
+            font-size: 0.9rem;
+            margin-bottom: 0;
+        }
+
+        /* Call to action sections */
+        .next-steps {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .next-steps h3 {
+            font-size: 1.8rem;
+            margin-bottom: 16px;
+        }
+
+        .next-steps p {
+            font-size: 1.1rem;
+            margin-bottom: 32px;
+            opacity: 0.9;
+        }
+
+        .cta-button {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            padding: 16px 32px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 16px;
+        }
+
+        .cta-button:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .cta-button.primary {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            border: none;
+        }
+
+        .cta-button.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+        }
+
+        /* Progress tracker */
+        .progress-tracker {
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+        }
+
+        .progress-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar {
+            width: 200px;
+            height: 6px;
+            background: rgba(102, 126, 234, 0.2);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+
+        /* Testimonial */
+        .testimonial {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05));
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 16px;
+            padding: 24px;
+            margin: 32px 0;
+            position: relative;
+            font-style: italic;
+        }
+
+        .testimonial::before {
+            content: '"';
+            position: absolute;
+            top: -10px;
+            left: 20px;
+            font-size: 4rem;
+            color: #10b981;
+            line-height: 1;
+        }
+
+        .testimonial-text {
+            color: #047857;
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            padding-left: 20px;
+        }
+
+        .testimonial-author {
+            color: #059669;
+            font-weight: 600;
+            text-align: right;
+            font-style: normal;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .lead-magnet-container {
+                padding: 0 16px;
+            }
+
+            .content-section {
+                padding: 24px;
+            }
+
+            .progress-tracker {
+                bottom: 16px;
+                left: 16px;
+                padding: 12px;
+            }
+
+            .progress-bar {
+                width: 150px;
+            }
+
+            .cta-button {
+                width: 100%;
+                margin-bottom: 12px;
+                margin-right: 0;
+            }
+        }
+
+        /* Animations */
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        /* Voice Agent Specific Styles */
+        .voice-agent-trigger {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+        }
+
+        .agent-context-hint {
+            position: fixed;
+            bottom: 120px;
+            right: 24px;
+            background: rgba(102, 126, 234, 0.95);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            max-width: 280px;
+            z-index: 999;
+            animation: slideInRight 0.5s ease-out;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .agent-context-hint.show {
+            opacity: 1;
+        }
+
+        .agent-context-hint::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            right: 30px;
+            border: 8px solid transparent;
+            border-top-color: rgba(102, 126, 234, 0.95);
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-container">
+            <h1>🔥 Los 7 Errores Fatales en Fitness</h1>
+            <p>Evita estos errores y acelera tu transformación</p>
+        </div>
+    </header>
+
+    <!-- Progress Tracker -->
+    <div class="progress-tracker">
+        <div class="progress-title">Progreso de lectura</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-text" id="progressText">0% completado</div>
+    </div>
+
+    <!-- Agent Context Hint -->
+    <div class="agent-context-hint" id="agentHint">
+        💡 ¿Ya terminaste de leer? Conversemos sobre cómo aplicar esto a tu caso específico
+    </div>
+
+    <!-- Main Content -->
+    <div class="lead-magnet-container">
+        <!-- Download Success Message -->
+        <div class="download-success">
+            <div class="success-icon">✓</div>
+            <h2>¡Descarga Exitosa!</h2>
+            <p>Ahora tienes acceso a información que puede transformar completamente tu enfoque de fitness</p>
+        </div>
+
+        <!-- Introduction -->
+        <div class="content-section fade-in-up">
+            <h3>🎯 Por Qué Esta Información Es Crucial Para Ti</h3>
+            <p>
+                Felicidades por dar este paso. Lo que vas a leer no son consejos genéricos que encuentras en cualquier blog. 
+                Esta información proviene de años de experiencia ayudando a más de 10,000 personas a transformar sus vidas.
+            </p>
+            <p>
+                Estos 7 errores son responsables del 95% de los fracasos en fitness. Si los evitas, estarás en el 5% 
+                que realmente logra resultados duraderos.
+            </p>
+        </div>
+
+        <!-- The 7 Errors -->
+        <div class="content-section">
+            <h3>❌ Los 7 Errores Que Están Saboteando Tu Progreso</h3>
+            <ul class="error-list">
+                <li class="error-item">
+                    <div class="error-number">1</div>
+                    <div class="error-content">
+                        <h4>Seguir Dietas Extremas</h4>
+                        <p>Las dietas de 1200 calorías destruyen tu metabolismo y garantizan el efecto rebote. Tu cuerpo entra en modo supervivencia y ralentiza todo.</p>
+                    </div>
+                </li>
+                <li class="error-item">
+                    <div class="error-number">2</div>
+                    <div class="error-content">
+                        <h4>Hacer Solo Cardio</h4>
+                        <p>El cardio excesivo sin entrenamiento de fuerza te hace perder músculo, bajando tu metabolismo basal y creando el temido "skinny fat".</p>
+                    </div>
+                </li>
+                <li class="error-item">
+                    <div class="error-number">3</div>
+                    <div class="error-content">
+                        <h4>No Tener Un Plan Específico</h4>
+                        <p>Entrenar sin un programa estructurado es como manejar sin GPS. Puedes moverte, pero nunca llegas a tu destino.</p>
+                    </div>
+                </li>
+                <li class="error-item">
+                    <div class="error-number">4</div>
+                    <div class="error-content">
+                        <h4>Ignorar El Descanso</h4>
+                        <p>Más no es mejor. Sin recuperación adecuada, tu cuerpo no puede adaptarse y terminas sobrentrenado y estancado.</p>
+                    </div>
+                </li>
+                <li class="error-item">
+                    <div class="error-number">5</div>
+                    <div class="error-content">
+                        <h4>Buscar Soluciones Mágicas</h4>
+                        <p>Suplementos milagrosos, detox de 7 días, fajas reductoras... nada de esto funciona. Solo te quitan dinero y tiempo.</p>
+                    </div>
+                </li>
+                <li class="error-item">
+                    <div class="error-number">6</div>
+                    <div class="error-content">
+                        <h4>Compararte Con Otros</h4>
+                        <p>Tu genética, hormonas, estilo de vida y punto de partida son únicos. Compararte solo genera frustración e inconsistencia.</p>
+                    </div>
+                </li>
+                <li class="error-item">
+                    <div class="error-number">7</div>
+                    <div class="error-content">
+                        <h4>No Tener Seguimiento Profesional</h4>
+                        <p>Intentar transformarte solo es como operar a ciegas. Necesitas alguien que ajuste tu plan según tus resultados reales.</p>
+                    </div>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Why This Happens -->
+        <div class="content-section">
+            <h3>🧠 Por Qué Caemos En Estos Errores</h3>
+            <p>
+                Estos errores no son casualidad. Vivimos bombardeados por información contradictoria, promesas irreales 
+                y soluciones que suenan demasiado buenas para ser verdad.
+            </p>
+            <p>
+                La industria del fitness se beneficia de tu frustración. Mientras más confundido estés, más productos "nuevos" 
+                vas a comprar. Pero la verdad es simple: necesitas un enfoque personalizado, sostenible y científicamente probado.
+            </p>
+        </div>
+
+        <!-- Testimonial -->
+        <div class="testimonial">
+            <p class="testimonial-text">
+                "Después de años fallando con dietas extremas, finalmente entendí que necesitaba un enfoque personalizado. 
+                En 4 meses transformé mi cuerpo y mi mentalidad completamente."
+            </p>
+            <div class="testimonial-author">- María González, Ejecutiva, 34 años</div>
+        </div>
+
+        <!-- The Solution -->
+        <div class="content-section">
+            <h3>✅ La Solución: Un Sistema Personalizado</h3>
+            <p>
+                Ahora que conoces los errores, el siguiente paso es crear un plan que los evite completamente. 
+                Esto requiere tres elementos clave:
+            </p>
+            <ul style="margin: 16px 0; padding-left: 20px;">
+                <li><strong>Personalización:</strong> Un plan diseñado específicamente para tu cuerpo, horarios y preferencias</li>
+                <li><strong>Progresión inteligente:</strong> Ajustes constantes basados en tus resultados reales</li>
+                <li><strong>Soporte experto:</strong> Alguien que te guíe y mantenga accountable en todo el proceso</li>
+            </ul>
+        </div>
+
+        <!-- Next Steps CTA -->
+        <div class="next-steps">
+            <h3>🚀 ¿Listo Para Aplicar Esto A Tu Caso?</h3>
+            <p>
+                Esta información es poderosa, pero solo si la aplicas correctamente a tu situación específica. 
+                Cada persona es diferente y necesita un enfoque personalizado.
+            </p>
+            <button class="cta-button primary" onclick="triggerVoiceAgent('implementation')">
+                Sí, Quiero Saber Cómo Aplicarlo
+            </button>
+            <button class="cta-button" onclick="triggerVoiceAgent('questions')">
+                Tengo Algunas Preguntas
+            </button>
+        </div>
+    </div>
+
+    <!-- NGX Voice Agent Integration -->
+    <script 
+        src="../src/embed/UniversalEmbed.js"
+        data-touchpoint="lead-magnet"
+        data-size="medium"
+        data-position="bottom-right"
+        data-company-name="NGX"
+        data-primary-color="#667eea"
+        data-secondary-color="#764ba2"
+        data-auto-show="false"
+        data-max-shows-per-session="2"
+        data-max-shows-per-day="3"
+    ></script>
+
+    <script>
+        // Reading progress tracker
+        function updateReadingProgress() {
+            const container = document.querySelector('.lead-magnet-container');
+            const scrollTop = window.pageYOffset;
+            const docHeight = container.offsetHeight;
+            const winHeight = window.innerHeight;
+            const scrollPercent = Math.min((scrollTop / (docHeight - winHeight)) * 100, 100);
+            
+            document.getElementById('progressFill').style.width = scrollPercent + '%';
+            document.getElementById('progressText').textContent = Math.round(scrollPercent) + '% completado';
+            
+            return scrollPercent;
+        }
+
+        // Show agent hint based on reading progress
+        function showAgentHint(progress) {
+            const hint = document.getElementById('agentHint');
+            
+            if (progress > 70 && !hint.classList.contains('show')) {
+                hint.classList.add('show');
+                
+                // Auto-hide after 8 seconds
+                setTimeout(() => {
+                    hint.classList.remove('show');
+                }, 8000);
+            }
+        }
+
+        // Scroll event listener
+        window.addEventListener('scroll', () => {
+            const progress = updateReadingProgress();
+            showAgentHint(progress);
+        });
+
+        // Animation observer for fade-in effects
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-in-up');
+                }
+            });
+        }, observerOptions);
+
+        // Observe all content sections
+        document.querySelectorAll('.content-section').forEach(section => {
+            observer.observe(section);
+        });
+
+        // Voice agent integration
+        function triggerVoiceAgent(context = 'default') {
+            if (window.ngxVoiceAgent) {
+                window.ngxVoiceAgent.show();
+                window.ngxVoiceAgent.track('lead_magnet_cta', {
+                    context: context,
+                    reading_progress: updateReadingProgress(),
+                    page_type: 'lead_magnet_download'
+                });
+            }
+        }
+
+        // Advanced voice agent configurations for lead magnet context
+        if (window.ngxVoiceAgent) {
+            // Listen for agent events
+            window.ngxVoiceAgent.on('show', () => {
+                console.log('🎯 Voice agent activated on lead magnet page');
+                
+                // Hide the hint when agent shows
+                document.getElementById('agentHint').classList.remove('show');
+            });
+
+            window.ngxVoiceAgent.on('trigger', (event) => {
+                console.log('🎯 Smart trigger fired:', event.type);
+                
+                const progress = updateReadingProgress();
+                
+                // Contextual responses based on lead magnet engagement
+                if (event.type === 'scroll' && progress > 80) {
+                    window.ngxVoiceAgent.updateConfig({
+                        context: {
+                            customMessage: "¡Excelente! Veo que terminaste de leer toda la guía. Esto muestra que realmente estás comprometido con tu transformación. ¿Conversamos sobre cómo aplicar específicamente estos conceptos a tu situación?"
+                        }
+                    });
+                } else if (event.type === 'time' && progress > 50) {
+                    window.ngxVoiceAgent.updateConfig({
+                        context: {
+                            customMessage: "Perfecto timing. Veo que ya leíste la mayor parte de la información. ¿Te gustaría que conversemos sobre cuál de estos 7 errores podría estar afectándote más?"
+                        }
+                    });
+                } else if (event.type === 'exit-intent') {
+                    window.ngxVoiceAgent.updateConfig({
+                        context: {
+                            customMessage: "¡Espera! Ya descargaste información valiosa. ¿Te toma 3 minutos una conversación que podría ahorrarte meses de prueba y error?"
+                        }
+                    });
+                }
+            });
+
+            // Update agent state with lead magnet specific data
+            setInterval(() => {
+                const progress = updateReadingProgress();
+                const timeOnPage = Date.now() - performance.timing.navigationStart;
+                
+                window.ngxVoiceAgent.setState({
+                    readingProgress: progress,
+                    resourceDownloaded: true,
+                    contentType: 'lead_magnet',
+                    resourceTopic: '7_fitness_errors',
+                    engagementLevel: progress > 70 ? 'high' : progress > 30 ? 'medium' : 'low',
+                    timeSpentReading: timeOnPage
+                });
+            }, 3000);
+
+            // Smart trigger after significant engagement
+            setTimeout(() => {
+                const progress = updateReadingProgress();
+                const timeOnPage = Date.now() - performance.timing.navigationStart;
+                
+                // Auto-trigger if user spent significant time and read substantial content
+                if (timeOnPage > 120000 && progress > 60) { // 2 minutes + 60% read
+                    window.ngxVoiceAgent.manualTrigger('contextual', {
+                        reason: 'high_engagement_lead_magnet',
+                        reading_progress: progress,
+                        time_spent: timeOnPage
+                    });
+                }
+            }, 120000); // Check after 2 minutes
+        }
+
+        // Track engagement events
+        let errorSectionViews = 0;
+        const errorSections = document.querySelectorAll('.error-item');
+
+        const errorObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    errorSectionViews++;
+                    if (window.ngxVoiceAgent) {
+                        window.ngxVoiceAgent.track('error_section_viewed', {
+                            error_number: errorSectionViews,
+                            total_errors_viewed: errorSectionViews
+                        });
+                    }
+                }
+            });
+        }, { threshold: 0.5 });
+
+        errorSections.forEach(section => {
+            errorObserver.observe(section);
+        });
+
+        // Track CTA interactions
+        document.querySelectorAll('.cta-button').forEach(button => {
+            button.addEventListener('click', () => {
+                if (window.ngxVoiceAgent) {
+                    window.ngxVoiceAgent.track('lead_magnet_cta_clicked', {
+                        button_text: button.textContent.trim(),
+                        reading_progress: updateReadingProgress(),
+                        errors_viewed: errorSectionViews
+                    });
+                }
+            });
+        });
+
+        // Initialize reading progress
+        updateReadingProgress();
+    </script>
+</body>
+</html>

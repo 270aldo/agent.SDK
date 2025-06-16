@@ -1,0 +1,1800 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.9, pytest-7.4.0, pluggy-1.5.0 -- /Users/aldoolivas/miniforge3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/aldoolivas/Desktop/Agentes SKD_voz
+configfile: pytest.ini
+plugins: anyio-4.9.0, cov-4.1.0, asyncio-0.21.1, mock-3.11.1
+asyncio: mode=Mode.STRICT
+collecting ... collected 8 items
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting FAILED [ 12%]
+tests/security/test_security_measures.py::TestSecurityMeasures::test_security_headers FAILED [ 25%]
+tests/security/test_security_measures.py::TestSecurityMeasures::test_token_expiration FAILED [ 37%]
+tests/security/test_security_measures.py::TestSecurityMeasures::test_invalid_token_rejection FAILED [ 50%]
+tests/security/test_security_measures.py::TestSecurityMeasures::test_expired_token_rejection FAILED [ 62%]
+tests/security/test_security_measures.py::TestSecurityMeasures::test_permission_enforcement FAILED [ 75%]
+tests/security/test_security_measures.py::TestSecurityMeasures::test_input_validation FAILED [ 87%]
+tests/security/test_security_measures.py::TestSecurityMeasures::test_error_sanitization FAILED [100%]
+
+=================================== FAILURES ===================================
+___________________ TestSecurityMeasures.test_rate_limiting ____________________
+
+self = <test_security_measures.TestSecurityMeasures object at 0x1069e1430>
+security_client = <tests.security.security_test_config.CompatibleTestClient object at 0x107223fb0>
+
+    def test_rate_limiting(self, security_client):
+        # Usar el cliente de prueba proporcionado por el fixture
+        client = security_client
+        """Prueba que la limitación de tasa funcione correctamente."""
+        # Realizar múltiples solicitudes rápidamente
+        endpoint = "/health"
+        num_requests = 70  # Más que el límite por minuto
+    
+        responses = []
+        for _ in range(num_requests):
+>           response = client.get(endpoint)
+
+tests/security/test_security_measures.py:32: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1053: in get
+    return self.request(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient._TestClientTransport object at 0x109c75490>
+request = <Request('GET', 'http://testserver/health')>
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        scheme = request.url.scheme
+        netloc = request.url.netloc.decode(encoding="ascii")
+        path = request.url.path
+        raw_path = request.url.raw_path
+        query = request.url.query.decode(encoding="ascii")
+    
+        default_port = {"http": 80, "ws": 80, "https": 443, "wss": 443}[scheme]
+    
+        if ":" in netloc:
+            host, port_string = netloc.split(":", 1)
+            port = int(port_string)
+        else:
+            host = netloc
+            port = default_port
+    
+        # Include the 'host' header.
+        if "host" in request.headers:
+            headers: list[tuple[bytes, bytes]] = []
+        elif port == default_port:  # pragma: no cover
+            headers = [(b"host", host.encode())]
+        else:  # pragma: no cover
+            headers = [(b"host", (f"{host}:{port}").encode())]
+    
+        # Include other request headers.
+        headers += [
+            (key.lower().encode(), value.encode())
+            for key, value in request.headers.multi_items()
+        ]
+    
+        scope: dict[str, typing.Any]
+    
+        if scheme in {"ws", "wss"}:
+            subprotocol = request.headers.get("sec-websocket-protocol", None)
+            if subprotocol is None:
+                subprotocols: typing.Sequence[str] = []
+            else:
+                subprotocols = [value.strip() for value in subprotocol.split(",")]
+            scope = {
+                "type": "websocket",
+                "path": unquote(path),
+                "raw_path": raw_path,
+                "root_path": self.root_path,
+                "scheme": scheme,
+                "query_string": query.encode(),
+                "headers": headers,
+                "client": None,
+                "server": [host, port],
+                "subprotocols": subprotocols,
+                "state": self.app_state.copy(),
+            }
+            session = WebSocketTestSession(self.app, scope, self.portal_factory)
+            raise _Upgrade(session)
+    
+        scope = {
+            "type": "http",
+            "http_version": "1.1",
+            "method": request.method,
+            "path": unquote(path),
+            "raw_path": raw_path,
+            "root_path": self.root_path,
+            "scheme": scheme,
+            "query_string": query.encode(),
+            "headers": headers,
+            "client": None,
+            "server": [host, port],
+            "extensions": {"http.response.debug": {}},
+            "state": self.app_state.copy(),
+        }
+    
+        request_complete = False
+        response_started = False
+        response_complete: anyio.Event
+        raw_kwargs: dict[str, typing.Any] = {"stream": io.BytesIO()}
+        template = None
+        context = None
+    
+        async def receive() -> Message:
+            nonlocal request_complete
+    
+            if request_complete:
+                if not response_complete.is_set():
+                    await response_complete.wait()
+                return {"type": "http.disconnect"}
+    
+            body = request.read()
+            if isinstance(body, str):
+                body_bytes: bytes = body.encode("utf-8")  # pragma: no cover
+            elif body is None:
+                body_bytes = b""  # pragma: no cover
+            elif isinstance(body, GeneratorType):
+                try:  # pragma: no cover
+                    chunk = body.send(None)
+                    if isinstance(chunk, str):
+                        chunk = chunk.encode("utf-8")
+                    return {"type": "http.request", "body": chunk, "more_body": True}
+                except StopIteration:  # pragma: no cover
+                    request_complete = True
+                    return {"type": "http.request", "body": b""}
+            else:
+                body_bytes = body
+    
+            request_complete = True
+            return {"type": "http.request", "body": body_bytes}
+    
+        async def send(message: Message) -> None:
+            nonlocal raw_kwargs, response_started, template, context
+    
+            if message["type"] == "http.response.start":
+                assert (
+                    not response_started
+                ), 'Received multiple "http.response.start" messages.'
+                raw_kwargs["status_code"] = message["status"]
+                raw_kwargs["headers"] = [
+                    (key.decode(), value.decode())
+                    for key, value in message.get("headers", [])
+                ]
+                response_started = True
+            elif message["type"] == "http.response.body":
+                assert (
+                    response_started
+                ), 'Received "http.response.body" without "http.response.start".'
+                assert (
+                    not response_complete.is_set()
+                ), 'Received "http.response.body" after response completed.'
+                body = message.get("body", b"")
+                more_body = message.get("more_body", False)
+                if request.method != "HEAD":
+                    raw_kwargs["stream"].write(body)
+                if not more_body:
+                    raw_kwargs["stream"].seek(0)
+                    response_complete.set()
+            elif message["type"] == "http.response.debug":
+                template = message["info"]["template"]
+                context = message["info"]["context"]
+    
+        try:
+            with self.portal_factory() as portal:
+                response_complete = portal.call(anyio.Event)
+                portal.call(self.app, scope, receive, send)
+        except BaseException as exc:
+            if self.raise_server_exceptions:
+                raise exc
+    
+        if self.raise_server_exceptions:
+>           assert response_started, "TestClient did not receive any response."
+E           AssertionError: TestClient did not receive any response.
+
+../../miniforge3/lib/python3.12/site-packages/starlette/testclient.py:375: AssertionError
+------------------------------ Captured log setup ------------------------------
+ERROR    src.services.predictive_model_service:predictive_model_service.py:59 Error al inicializar tablas de modelos predictivos: {'code': '42P01', 'details': None, 'hint': None, 'message': 'relation "public.predictive_models" does not exist'}
+ERROR    src.services.predictive_model_service:predictive_model_service.py:59 Error al inicializar tablas de modelos predictivos: {'code': '42P01', 'details': None, 'hint': None, 'message': 'relation "public.predictive_models" does not exist'}
+__________________ TestSecurityMeasures.test_security_headers __________________
+
+self = <test_security_measures.TestSecurityMeasures object at 0x107223560>
+security_client = <tests.security.security_test_config.CompatibleTestClient object at 0x10980d550>
+
+    def test_security_headers(self, security_client):
+        # Usar el cliente de prueba proporcionado por el fixture
+        client = security_client
+        """Prueba que los encabezados de seguridad estén presentes en las respuestas."""
+        # Realizar una solicitud
+>       response = client.get("/health")
+
+tests/security/test_security_measures.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1053: in get
+    return self.request(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient._TestClientTransport object at 0x109d8cec0>
+request = <Request('GET', 'http://testserver/health')>
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        scheme = request.url.scheme
+        netloc = request.url.netloc.decode(encoding="ascii")
+        path = request.url.path
+        raw_path = request.url.raw_path
+        query = request.url.query.decode(encoding="ascii")
+    
+        default_port = {"http": 80, "ws": 80, "https": 443, "wss": 443}[scheme]
+    
+        if ":" in netloc:
+            host, port_string = netloc.split(":", 1)
+            port = int(port_string)
+        else:
+            host = netloc
+            port = default_port
+    
+        # Include the 'host' header.
+        if "host" in request.headers:
+            headers: list[tuple[bytes, bytes]] = []
+        elif port == default_port:  # pragma: no cover
+            headers = [(b"host", host.encode())]
+        else:  # pragma: no cover
+            headers = [(b"host", (f"{host}:{port}").encode())]
+    
+        # Include other request headers.
+        headers += [
+            (key.lower().encode(), value.encode())
+            for key, value in request.headers.multi_items()
+        ]
+    
+        scope: dict[str, typing.Any]
+    
+        if scheme in {"ws", "wss"}:
+            subprotocol = request.headers.get("sec-websocket-protocol", None)
+            if subprotocol is None:
+                subprotocols: typing.Sequence[str] = []
+            else:
+                subprotocols = [value.strip() for value in subprotocol.split(",")]
+            scope = {
+                "type": "websocket",
+                "path": unquote(path),
+                "raw_path": raw_path,
+                "root_path": self.root_path,
+                "scheme": scheme,
+                "query_string": query.encode(),
+                "headers": headers,
+                "client": None,
+                "server": [host, port],
+                "subprotocols": subprotocols,
+                "state": self.app_state.copy(),
+            }
+            session = WebSocketTestSession(self.app, scope, self.portal_factory)
+            raise _Upgrade(session)
+    
+        scope = {
+            "type": "http",
+            "http_version": "1.1",
+            "method": request.method,
+            "path": unquote(path),
+            "raw_path": raw_path,
+            "root_path": self.root_path,
+            "scheme": scheme,
+            "query_string": query.encode(),
+            "headers": headers,
+            "client": None,
+            "server": [host, port],
+            "extensions": {"http.response.debug": {}},
+            "state": self.app_state.copy(),
+        }
+    
+        request_complete = False
+        response_started = False
+        response_complete: anyio.Event
+        raw_kwargs: dict[str, typing.Any] = {"stream": io.BytesIO()}
+        template = None
+        context = None
+    
+        async def receive() -> Message:
+            nonlocal request_complete
+    
+            if request_complete:
+                if not response_complete.is_set():
+                    await response_complete.wait()
+                return {"type": "http.disconnect"}
+    
+            body = request.read()
+            if isinstance(body, str):
+                body_bytes: bytes = body.encode("utf-8")  # pragma: no cover
+            elif body is None:
+                body_bytes = b""  # pragma: no cover
+            elif isinstance(body, GeneratorType):
+                try:  # pragma: no cover
+                    chunk = body.send(None)
+                    if isinstance(chunk, str):
+                        chunk = chunk.encode("utf-8")
+                    return {"type": "http.request", "body": chunk, "more_body": True}
+                except StopIteration:  # pragma: no cover
+                    request_complete = True
+                    return {"type": "http.request", "body": b""}
+            else:
+                body_bytes = body
+    
+            request_complete = True
+            return {"type": "http.request", "body": body_bytes}
+    
+        async def send(message: Message) -> None:
+            nonlocal raw_kwargs, response_started, template, context
+    
+            if message["type"] == "http.response.start":
+                assert (
+                    not response_started
+                ), 'Received multiple "http.response.start" messages.'
+                raw_kwargs["status_code"] = message["status"]
+                raw_kwargs["headers"] = [
+                    (key.decode(), value.decode())
+                    for key, value in message.get("headers", [])
+                ]
+                response_started = True
+            elif message["type"] == "http.response.body":
+                assert (
+                    response_started
+                ), 'Received "http.response.body" without "http.response.start".'
+                assert (
+                    not response_complete.is_set()
+                ), 'Received "http.response.body" after response completed.'
+                body = message.get("body", b"")
+                more_body = message.get("more_body", False)
+                if request.method != "HEAD":
+                    raw_kwargs["stream"].write(body)
+                if not more_body:
+                    raw_kwargs["stream"].seek(0)
+                    response_complete.set()
+            elif message["type"] == "http.response.debug":
+                template = message["info"]["template"]
+                context = message["info"]["context"]
+    
+        try:
+            with self.portal_factory() as portal:
+                response_complete = portal.call(anyio.Event)
+                portal.call(self.app, scope, receive, send)
+        except BaseException as exc:
+            if self.raise_server_exceptions:
+                raise exc
+    
+        if self.raise_server_exceptions:
+>           assert response_started, "TestClient did not receive any response."
+E           AssertionError: TestClient did not receive any response.
+
+../../miniforge3/lib/python3.12/site-packages/starlette/testclient.py:375: AssertionError
+__________________ TestSecurityMeasures.test_token_expiration __________________
+
+self = <test_security_measures.TestSecurityMeasures object at 0x107223710>
+security_client = <tests.security.security_test_config.CompatibleTestClient object at 0x109c76210>
+test_user = {'password': 'test_password', 'permissions': ['read:analytics', 'read:models'], 'user_id': 'test_user_id', 'username': 'test_user'}
+
+    def test_token_expiration(self, security_client, test_user):
+        # Usar el cliente de prueba proporcionado por el fixture
+        client = security_client
+        """Prueba que los tokens expiren correctamente."""
+        # Iniciar sesión para obtener token
+>       login_response = client.post(
+            "/auth/login",
+            data={
+                "username": test_user["username"],
+                "password": test_user["password"]
+            }
+        )
+
+tests/security/test_security_measures.py:80: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1144: in post
+    return self.request(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient._TestClientTransport object at 0x109c76270>
+request = <Request('POST', 'http://testserver/auth/login')>
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        scheme = request.url.scheme
+        netloc = request.url.netloc.decode(encoding="ascii")
+        path = request.url.path
+        raw_path = request.url.raw_path
+        query = request.url.query.decode(encoding="ascii")
+    
+        default_port = {"http": 80, "ws": 80, "https": 443, "wss": 443}[scheme]
+    
+        if ":" in netloc:
+            host, port_string = netloc.split(":", 1)
+            port = int(port_string)
+        else:
+            host = netloc
+            port = default_port
+    
+        # Include the 'host' header.
+        if "host" in request.headers:
+            headers: list[tuple[bytes, bytes]] = []
+        elif port == default_port:  # pragma: no cover
+            headers = [(b"host", host.encode())]
+        else:  # pragma: no cover
+            headers = [(b"host", (f"{host}:{port}").encode())]
+    
+        # Include other request headers.
+        headers += [
+            (key.lower().encode(), value.encode())
+            for key, value in request.headers.multi_items()
+        ]
+    
+        scope: dict[str, typing.Any]
+    
+        if scheme in {"ws", "wss"}:
+            subprotocol = request.headers.get("sec-websocket-protocol", None)
+            if subprotocol is None:
+                subprotocols: typing.Sequence[str] = []
+            else:
+                subprotocols = [value.strip() for value in subprotocol.split(",")]
+            scope = {
+                "type": "websocket",
+                "path": unquote(path),
+                "raw_path": raw_path,
+                "root_path": self.root_path,
+                "scheme": scheme,
+                "query_string": query.encode(),
+                "headers": headers,
+                "client": None,
+                "server": [host, port],
+                "subprotocols": subprotocols,
+                "state": self.app_state.copy(),
+            }
+            session = WebSocketTestSession(self.app, scope, self.portal_factory)
+            raise _Upgrade(session)
+    
+        scope = {
+            "type": "http",
+            "http_version": "1.1",
+            "method": request.method,
+            "path": unquote(path),
+            "raw_path": raw_path,
+            "root_path": self.root_path,
+            "scheme": scheme,
+            "query_string": query.encode(),
+            "headers": headers,
+            "client": None,
+            "server": [host, port],
+            "extensions": {"http.response.debug": {}},
+            "state": self.app_state.copy(),
+        }
+    
+        request_complete = False
+        response_started = False
+        response_complete: anyio.Event
+        raw_kwargs: dict[str, typing.Any] = {"stream": io.BytesIO()}
+        template = None
+        context = None
+    
+        async def receive() -> Message:
+            nonlocal request_complete
+    
+            if request_complete:
+                if not response_complete.is_set():
+                    await response_complete.wait()
+                return {"type": "http.disconnect"}
+    
+            body = request.read()
+            if isinstance(body, str):
+                body_bytes: bytes = body.encode("utf-8")  # pragma: no cover
+            elif body is None:
+                body_bytes = b""  # pragma: no cover
+            elif isinstance(body, GeneratorType):
+                try:  # pragma: no cover
+                    chunk = body.send(None)
+                    if isinstance(chunk, str):
+                        chunk = chunk.encode("utf-8")
+                    return {"type": "http.request", "body": chunk, "more_body": True}
+                except StopIteration:  # pragma: no cover
+                    request_complete = True
+                    return {"type": "http.request", "body": b""}
+            else:
+                body_bytes = body
+    
+            request_complete = True
+            return {"type": "http.request", "body": body_bytes}
+    
+        async def send(message: Message) -> None:
+            nonlocal raw_kwargs, response_started, template, context
+    
+            if message["type"] == "http.response.start":
+                assert (
+                    not response_started
+                ), 'Received multiple "http.response.start" messages.'
+                raw_kwargs["status_code"] = message["status"]
+                raw_kwargs["headers"] = [
+                    (key.decode(), value.decode())
+                    for key, value in message.get("headers", [])
+                ]
+                response_started = True
+            elif message["type"] == "http.response.body":
+                assert (
+                    response_started
+                ), 'Received "http.response.body" without "http.response.start".'
+                assert (
+                    not response_complete.is_set()
+                ), 'Received "http.response.body" after response completed.'
+                body = message.get("body", b"")
+                more_body = message.get("more_body", False)
+                if request.method != "HEAD":
+                    raw_kwargs["stream"].write(body)
+                if not more_body:
+                    raw_kwargs["stream"].seek(0)
+                    response_complete.set()
+            elif message["type"] == "http.response.debug":
+                template = message["info"]["template"]
+                context = message["info"]["context"]
+    
+        try:
+            with self.portal_factory() as portal:
+                response_complete = portal.call(anyio.Event)
+                portal.call(self.app, scope, receive, send)
+        except BaseException as exc:
+            if self.raise_server_exceptions:
+                raise exc
+    
+        if self.raise_server_exceptions:
+>           assert response_started, "TestClient did not receive any response."
+E           AssertionError: TestClient did not receive any response.
+
+../../miniforge3/lib/python3.12/site-packages/starlette/testclient.py:375: AssertionError
+______________ TestSecurityMeasures.test_invalid_token_rejection _______________
+
+self = <test_security_measures.TestSecurityMeasures object at 0x107223860>
+security_client = <tests.security.security_test_config.CompatibleTestClient object at 0x109d8e5a0>
+
+    def test_invalid_token_rejection(self, security_client):
+        # Usar el cliente de prueba proporcionado por el fixture
+        client = security_client
+        """Prueba que los tokens inválidos sean rechazados."""
+        # Crear un token inválido
+        invalid_token = "invalid.token.here"
+    
+        # Intentar acceder a un endpoint protegido
+>       response = client.get(
+            "/auth/me",
+            headers={"Authorization": f"Bearer {invalid_token}"}
+        )
+
+tests/security/test_security_measures.py:114: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1053: in get
+    return self.request(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient._TestClientTransport object at 0x109d8f3e0>
+request = <Request('GET', 'http://testserver/auth/me')>
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        scheme = request.url.scheme
+        netloc = request.url.netloc.decode(encoding="ascii")
+        path = request.url.path
+        raw_path = request.url.raw_path
+        query = request.url.query.decode(encoding="ascii")
+    
+        default_port = {"http": 80, "ws": 80, "https": 443, "wss": 443}[scheme]
+    
+        if ":" in netloc:
+            host, port_string = netloc.split(":", 1)
+            port = int(port_string)
+        else:
+            host = netloc
+            port = default_port
+    
+        # Include the 'host' header.
+        if "host" in request.headers:
+            headers: list[tuple[bytes, bytes]] = []
+        elif port == default_port:  # pragma: no cover
+            headers = [(b"host", host.encode())]
+        else:  # pragma: no cover
+            headers = [(b"host", (f"{host}:{port}").encode())]
+    
+        # Include other request headers.
+        headers += [
+            (key.lower().encode(), value.encode())
+            for key, value in request.headers.multi_items()
+        ]
+    
+        scope: dict[str, typing.Any]
+    
+        if scheme in {"ws", "wss"}:
+            subprotocol = request.headers.get("sec-websocket-protocol", None)
+            if subprotocol is None:
+                subprotocols: typing.Sequence[str] = []
+            else:
+                subprotocols = [value.strip() for value in subprotocol.split(",")]
+            scope = {
+                "type": "websocket",
+                "path": unquote(path),
+                "raw_path": raw_path,
+                "root_path": self.root_path,
+                "scheme": scheme,
+                "query_string": query.encode(),
+                "headers": headers,
+                "client": None,
+                "server": [host, port],
+                "subprotocols": subprotocols,
+                "state": self.app_state.copy(),
+            }
+            session = WebSocketTestSession(self.app, scope, self.portal_factory)
+            raise _Upgrade(session)
+    
+        scope = {
+            "type": "http",
+            "http_version": "1.1",
+            "method": request.method,
+            "path": unquote(path),
+            "raw_path": raw_path,
+            "root_path": self.root_path,
+            "scheme": scheme,
+            "query_string": query.encode(),
+            "headers": headers,
+            "client": None,
+            "server": [host, port],
+            "extensions": {"http.response.debug": {}},
+            "state": self.app_state.copy(),
+        }
+    
+        request_complete = False
+        response_started = False
+        response_complete: anyio.Event
+        raw_kwargs: dict[str, typing.Any] = {"stream": io.BytesIO()}
+        template = None
+        context = None
+    
+        async def receive() -> Message:
+            nonlocal request_complete
+    
+            if request_complete:
+                if not response_complete.is_set():
+                    await response_complete.wait()
+                return {"type": "http.disconnect"}
+    
+            body = request.read()
+            if isinstance(body, str):
+                body_bytes: bytes = body.encode("utf-8")  # pragma: no cover
+            elif body is None:
+                body_bytes = b""  # pragma: no cover
+            elif isinstance(body, GeneratorType):
+                try:  # pragma: no cover
+                    chunk = body.send(None)
+                    if isinstance(chunk, str):
+                        chunk = chunk.encode("utf-8")
+                    return {"type": "http.request", "body": chunk, "more_body": True}
+                except StopIteration:  # pragma: no cover
+                    request_complete = True
+                    return {"type": "http.request", "body": b""}
+            else:
+                body_bytes = body
+    
+            request_complete = True
+            return {"type": "http.request", "body": body_bytes}
+    
+        async def send(message: Message) -> None:
+            nonlocal raw_kwargs, response_started, template, context
+    
+            if message["type"] == "http.response.start":
+                assert (
+                    not response_started
+                ), 'Received multiple "http.response.start" messages.'
+                raw_kwargs["status_code"] = message["status"]
+                raw_kwargs["headers"] = [
+                    (key.decode(), value.decode())
+                    for key, value in message.get("headers", [])
+                ]
+                response_started = True
+            elif message["type"] == "http.response.body":
+                assert (
+                    response_started
+                ), 'Received "http.response.body" without "http.response.start".'
+                assert (
+                    not response_complete.is_set()
+                ), 'Received "http.response.body" after response completed.'
+                body = message.get("body", b"")
+                more_body = message.get("more_body", False)
+                if request.method != "HEAD":
+                    raw_kwargs["stream"].write(body)
+                if not more_body:
+                    raw_kwargs["stream"].seek(0)
+                    response_complete.set()
+            elif message["type"] == "http.response.debug":
+                template = message["info"]["template"]
+                context = message["info"]["context"]
+    
+        try:
+            with self.portal_factory() as portal:
+                response_complete = portal.call(anyio.Event)
+                portal.call(self.app, scope, receive, send)
+        except BaseException as exc:
+            if self.raise_server_exceptions:
+                raise exc
+    
+        if self.raise_server_exceptions:
+>           assert response_started, "TestClient did not receive any response."
+E           AssertionError: TestClient did not receive any response.
+
+../../miniforge3/lib/python3.12/site-packages/starlette/testclient.py:375: AssertionError
+______________ TestSecurityMeasures.test_expired_token_rejection _______________
+
+self = <test_security_measures.TestSecurityMeasures object at 0x107223410>
+security_client = <tests.security.security_test_config.CompatibleTestClient object at 0x109d61d30>
+
+    def test_expired_token_rejection(self, security_client):
+        # Usar el cliente de prueba proporcionado por el fixture
+        client = security_client
+        """Prueba que los tokens expirados sean rechazados."""
+        # Crear un token expirado manualmente
+        payload = {
+            "sub": "test_user",
+            "permissions": ["read:models"],
+            "exp": datetime.utcnow() - timedelta(minutes=5),  # Expirado hace 5 minutos
+            "iat": datetime.utcnow() - timedelta(hours=2),
+            "type": "access"  # Debe ser 'type', no 'token_type'
+        }
+    
+        # Firmar el token
+        expired_token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    
+        # Intentar acceder a un endpoint protegido
+>       response = client.get(
+            "/auth/me",
+            headers={"Authorization": f"Bearer {expired_token}"}
+        )
+
+tests/security/test_security_measures.py:143: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1053: in get
+    return self.request(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient._TestClientTransport object at 0x109d62720>
+request = <Request('GET', 'http://testserver/auth/me')>
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        scheme = request.url.scheme
+        netloc = request.url.netloc.decode(encoding="ascii")
+        path = request.url.path
+        raw_path = request.url.raw_path
+        query = request.url.query.decode(encoding="ascii")
+    
+        default_port = {"http": 80, "ws": 80, "https": 443, "wss": 443}[scheme]
+    
+        if ":" in netloc:
+            host, port_string = netloc.split(":", 1)
+            port = int(port_string)
+        else:
+            host = netloc
+            port = default_port
+    
+        # Include the 'host' header.
+        if "host" in request.headers:
+            headers: list[tuple[bytes, bytes]] = []
+        elif port == default_port:  # pragma: no cover
+            headers = [(b"host", host.encode())]
+        else:  # pragma: no cover
+            headers = [(b"host", (f"{host}:{port}").encode())]
+    
+        # Include other request headers.
+        headers += [
+            (key.lower().encode(), value.encode())
+            for key, value in request.headers.multi_items()
+        ]
+    
+        scope: dict[str, typing.Any]
+    
+        if scheme in {"ws", "wss"}:
+            subprotocol = request.headers.get("sec-websocket-protocol", None)
+            if subprotocol is None:
+                subprotocols: typing.Sequence[str] = []
+            else:
+                subprotocols = [value.strip() for value in subprotocol.split(",")]
+            scope = {
+                "type": "websocket",
+                "path": unquote(path),
+                "raw_path": raw_path,
+                "root_path": self.root_path,
+                "scheme": scheme,
+                "query_string": query.encode(),
+                "headers": headers,
+                "client": None,
+                "server": [host, port],
+                "subprotocols": subprotocols,
+                "state": self.app_state.copy(),
+            }
+            session = WebSocketTestSession(self.app, scope, self.portal_factory)
+            raise _Upgrade(session)
+    
+        scope = {
+            "type": "http",
+            "http_version": "1.1",
+            "method": request.method,
+            "path": unquote(path),
+            "raw_path": raw_path,
+            "root_path": self.root_path,
+            "scheme": scheme,
+            "query_string": query.encode(),
+            "headers": headers,
+            "client": None,
+            "server": [host, port],
+            "extensions": {"http.response.debug": {}},
+            "state": self.app_state.copy(),
+        }
+    
+        request_complete = False
+        response_started = False
+        response_complete: anyio.Event
+        raw_kwargs: dict[str, typing.Any] = {"stream": io.BytesIO()}
+        template = None
+        context = None
+    
+        async def receive() -> Message:
+            nonlocal request_complete
+    
+            if request_complete:
+                if not response_complete.is_set():
+                    await response_complete.wait()
+                return {"type": "http.disconnect"}
+    
+            body = request.read()
+            if isinstance(body, str):
+                body_bytes: bytes = body.encode("utf-8")  # pragma: no cover
+            elif body is None:
+                body_bytes = b""  # pragma: no cover
+            elif isinstance(body, GeneratorType):
+                try:  # pragma: no cover
+                    chunk = body.send(None)
+                    if isinstance(chunk, str):
+                        chunk = chunk.encode("utf-8")
+                    return {"type": "http.request", "body": chunk, "more_body": True}
+                except StopIteration:  # pragma: no cover
+                    request_complete = True
+                    return {"type": "http.request", "body": b""}
+            else:
+                body_bytes = body
+    
+            request_complete = True
+            return {"type": "http.request", "body": body_bytes}
+    
+        async def send(message: Message) -> None:
+            nonlocal raw_kwargs, response_started, template, context
+    
+            if message["type"] == "http.response.start":
+                assert (
+                    not response_started
+                ), 'Received multiple "http.response.start" messages.'
+                raw_kwargs["status_code"] = message["status"]
+                raw_kwargs["headers"] = [
+                    (key.decode(), value.decode())
+                    for key, value in message.get("headers", [])
+                ]
+                response_started = True
+            elif message["type"] == "http.response.body":
+                assert (
+                    response_started
+                ), 'Received "http.response.body" without "http.response.start".'
+                assert (
+                    not response_complete.is_set()
+                ), 'Received "http.response.body" after response completed.'
+                body = message.get("body", b"")
+                more_body = message.get("more_body", False)
+                if request.method != "HEAD":
+                    raw_kwargs["stream"].write(body)
+                if not more_body:
+                    raw_kwargs["stream"].seek(0)
+                    response_complete.set()
+            elif message["type"] == "http.response.debug":
+                template = message["info"]["template"]
+                context = message["info"]["context"]
+    
+        try:
+            with self.portal_factory() as portal:
+                response_complete = portal.call(anyio.Event)
+                portal.call(self.app, scope, receive, send)
+        except BaseException as exc:
+            if self.raise_server_exceptions:
+                raise exc
+    
+        if self.raise_server_exceptions:
+>           assert response_started, "TestClient did not receive any response."
+E           AssertionError: TestClient did not receive any response.
+
+../../miniforge3/lib/python3.12/site-packages/starlette/testclient.py:375: AssertionError
+_______________ TestSecurityMeasures.test_permission_enforcement _______________
+
+self = <test_security_measures.TestSecurityMeasures object at 0x107222cc0>
+security_client = <tests.security.security_test_config.CompatibleTestClient object at 0x109d8e9f0>
+auth_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0X3VzZXJfaWQiLCJ1c2VybmFtZSI6InRlc3RfdXN...HMiXSwiZXhwIjoxNzQ4MjQ5MDEyLCJpYXQiOjE3NDgyNDcyMTIsInR5cGUiOiJhY2Nlc3MifQ.LxDW3sgJaLtJxhGAtCaBMN_HhOuW46HuWYxW2KTtlAQ'}
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbl91c2VyX2lkIiwidXNlcm5hbWUiOiJhZG1pbl9...taW4iLCJleHAiOjE3NDgyNDkwMTIsImlhdCI6MTc0ODI0NzIxMiwidHlwZSI6ImFjY2VzcyJ9.MsCeJ_Ng1FfLuK-WpwdfTvZCHYKKT38xySxA3XGmzEY'}
+
+    def test_permission_enforcement(self, security_client, auth_headers, admin_headers):
+        # Usar el cliente de prueba proporcionado por el fixture
+        client = security_client
+        """Prueba que se apliquen correctamente los permisos."""
+        # Endpoint que requiere permisos de administrador
+        endpoint = "/predictive/models"
+    
+        # Intentar acceder con usuario normal
+>       normal_response = client.get(
+            endpoint,
+            headers=auth_headers
+        )
+
+tests/security/test_security_measures.py:163: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1053: in get
+    return self.request(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient._TestClientTransport object at 0x109d8e7e0>
+request = <Request('GET', 'http://testserver/predictive/models')>
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        scheme = request.url.scheme
+        netloc = request.url.netloc.decode(encoding="ascii")
+        path = request.url.path
+        raw_path = request.url.raw_path
+        query = request.url.query.decode(encoding="ascii")
+    
+        default_port = {"http": 80, "ws": 80, "https": 443, "wss": 443}[scheme]
+    
+        if ":" in netloc:
+            host, port_string = netloc.split(":", 1)
+            port = int(port_string)
+        else:
+            host = netloc
+            port = default_port
+    
+        # Include the 'host' header.
+        if "host" in request.headers:
+            headers: list[tuple[bytes, bytes]] = []
+        elif port == default_port:  # pragma: no cover
+            headers = [(b"host", host.encode())]
+        else:  # pragma: no cover
+            headers = [(b"host", (f"{host}:{port}").encode())]
+    
+        # Include other request headers.
+        headers += [
+            (key.lower().encode(), value.encode())
+            for key, value in request.headers.multi_items()
+        ]
+    
+        scope: dict[str, typing.Any]
+    
+        if scheme in {"ws", "wss"}:
+            subprotocol = request.headers.get("sec-websocket-protocol", None)
+            if subprotocol is None:
+                subprotocols: typing.Sequence[str] = []
+            else:
+                subprotocols = [value.strip() for value in subprotocol.split(",")]
+            scope = {
+                "type": "websocket",
+                "path": unquote(path),
+                "raw_path": raw_path,
+                "root_path": self.root_path,
+                "scheme": scheme,
+                "query_string": query.encode(),
+                "headers": headers,
+                "client": None,
+                "server": [host, port],
+                "subprotocols": subprotocols,
+                "state": self.app_state.copy(),
+            }
+            session = WebSocketTestSession(self.app, scope, self.portal_factory)
+            raise _Upgrade(session)
+    
+        scope = {
+            "type": "http",
+            "http_version": "1.1",
+            "method": request.method,
+            "path": unquote(path),
+            "raw_path": raw_path,
+            "root_path": self.root_path,
+            "scheme": scheme,
+            "query_string": query.encode(),
+            "headers": headers,
+            "client": None,
+            "server": [host, port],
+            "extensions": {"http.response.debug": {}},
+            "state": self.app_state.copy(),
+        }
+    
+        request_complete = False
+        response_started = False
+        response_complete: anyio.Event
+        raw_kwargs: dict[str, typing.Any] = {"stream": io.BytesIO()}
+        template = None
+        context = None
+    
+        async def receive() -> Message:
+            nonlocal request_complete
+    
+            if request_complete:
+                if not response_complete.is_set():
+                    await response_complete.wait()
+                return {"type": "http.disconnect"}
+    
+            body = request.read()
+            if isinstance(body, str):
+                body_bytes: bytes = body.encode("utf-8")  # pragma: no cover
+            elif body is None:
+                body_bytes = b""  # pragma: no cover
+            elif isinstance(body, GeneratorType):
+                try:  # pragma: no cover
+                    chunk = body.send(None)
+                    if isinstance(chunk, str):
+                        chunk = chunk.encode("utf-8")
+                    return {"type": "http.request", "body": chunk, "more_body": True}
+                except StopIteration:  # pragma: no cover
+                    request_complete = True
+                    return {"type": "http.request", "body": b""}
+            else:
+                body_bytes = body
+    
+            request_complete = True
+            return {"type": "http.request", "body": body_bytes}
+    
+        async def send(message: Message) -> None:
+            nonlocal raw_kwargs, response_started, template, context
+    
+            if message["type"] == "http.response.start":
+                assert (
+                    not response_started
+                ), 'Received multiple "http.response.start" messages.'
+                raw_kwargs["status_code"] = message["status"]
+                raw_kwargs["headers"] = [
+                    (key.decode(), value.decode())
+                    for key, value in message.get("headers", [])
+                ]
+                response_started = True
+            elif message["type"] == "http.response.body":
+                assert (
+                    response_started
+                ), 'Received "http.response.body" without "http.response.start".'
+                assert (
+                    not response_complete.is_set()
+                ), 'Received "http.response.body" after response completed.'
+                body = message.get("body", b"")
+                more_body = message.get("more_body", False)
+                if request.method != "HEAD":
+                    raw_kwargs["stream"].write(body)
+                if not more_body:
+                    raw_kwargs["stream"].seek(0)
+                    response_complete.set()
+            elif message["type"] == "http.response.debug":
+                template = message["info"]["template"]
+                context = message["info"]["context"]
+    
+        try:
+            with self.portal_factory() as portal:
+                response_complete = portal.call(anyio.Event)
+                portal.call(self.app, scope, receive, send)
+        except BaseException as exc:
+            if self.raise_server_exceptions:
+                raise exc
+    
+        if self.raise_server_exceptions:
+>           assert response_started, "TestClient did not receive any response."
+E           AssertionError: TestClient did not receive any response.
+
+../../miniforge3/lib/python3.12/site-packages/starlette/testclient.py:375: AssertionError
+__________________ TestSecurityMeasures.test_input_validation __________________
+
+self = <test_security_measures.TestSecurityMeasures object at 0x107223b30>
+security_client = <tests.security.security_test_config.CompatibleTestClient object at 0x109d63590>
+auth_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0X3VzZXJfaWQiLCJ1c2VybmFtZSI6InRlc3RfdXN...HMiXSwiZXhwIjoxNzQ4MjQ5MDEyLCJpYXQiOjE3NDgyNDcyMTIsInR5cGUiOiJhY2Nlc3MifQ.LxDW3sgJaLtJxhGAtCaBMN_HhOuW46HuWYxW2KTtlAQ'}
+
+    def test_input_validation(self, security_client, auth_headers):
+        # Usar el cliente de prueba proporcionado por el fixture
+        client = security_client
+        """Prueba que la validación de entradas funcione correctamente."""
+        # Datos inválidos para la solicitud
+        invalid_data = {
+            "conversation_id": "test_conv",
+            "messages": [
+                {
+                    "role": "invalid_role",  # Rol inválido
+                    "content": "Mensaje de prueba",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            ]
+        }
+    
+        # Realizar solicitud con datos inválidos
+>       response = client.post(
+            "/predictive/objection/predict",
+            json=invalid_data,
+            headers=auth_headers
+        )
+
+tests/security/test_security_measures.py:202: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1144: in post
+    return self.request(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient._TestClientTransport object at 0x109d62bd0>
+request = <Request('POST', 'http://testserver/predictive/objection/predict')>
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        scheme = request.url.scheme
+        netloc = request.url.netloc.decode(encoding="ascii")
+        path = request.url.path
+        raw_path = request.url.raw_path
+        query = request.url.query.decode(encoding="ascii")
+    
+        default_port = {"http": 80, "ws": 80, "https": 443, "wss": 443}[scheme]
+    
+        if ":" in netloc:
+            host, port_string = netloc.split(":", 1)
+            port = int(port_string)
+        else:
+            host = netloc
+            port = default_port
+    
+        # Include the 'host' header.
+        if "host" in request.headers:
+            headers: list[tuple[bytes, bytes]] = []
+        elif port == default_port:  # pragma: no cover
+            headers = [(b"host", host.encode())]
+        else:  # pragma: no cover
+            headers = [(b"host", (f"{host}:{port}").encode())]
+    
+        # Include other request headers.
+        headers += [
+            (key.lower().encode(), value.encode())
+            for key, value in request.headers.multi_items()
+        ]
+    
+        scope: dict[str, typing.Any]
+    
+        if scheme in {"ws", "wss"}:
+            subprotocol = request.headers.get("sec-websocket-protocol", None)
+            if subprotocol is None:
+                subprotocols: typing.Sequence[str] = []
+            else:
+                subprotocols = [value.strip() for value in subprotocol.split(",")]
+            scope = {
+                "type": "websocket",
+                "path": unquote(path),
+                "raw_path": raw_path,
+                "root_path": self.root_path,
+                "scheme": scheme,
+                "query_string": query.encode(),
+                "headers": headers,
+                "client": None,
+                "server": [host, port],
+                "subprotocols": subprotocols,
+                "state": self.app_state.copy(),
+            }
+            session = WebSocketTestSession(self.app, scope, self.portal_factory)
+            raise _Upgrade(session)
+    
+        scope = {
+            "type": "http",
+            "http_version": "1.1",
+            "method": request.method,
+            "path": unquote(path),
+            "raw_path": raw_path,
+            "root_path": self.root_path,
+            "scheme": scheme,
+            "query_string": query.encode(),
+            "headers": headers,
+            "client": None,
+            "server": [host, port],
+            "extensions": {"http.response.debug": {}},
+            "state": self.app_state.copy(),
+        }
+    
+        request_complete = False
+        response_started = False
+        response_complete: anyio.Event
+        raw_kwargs: dict[str, typing.Any] = {"stream": io.BytesIO()}
+        template = None
+        context = None
+    
+        async def receive() -> Message:
+            nonlocal request_complete
+    
+            if request_complete:
+                if not response_complete.is_set():
+                    await response_complete.wait()
+                return {"type": "http.disconnect"}
+    
+            body = request.read()
+            if isinstance(body, str):
+                body_bytes: bytes = body.encode("utf-8")  # pragma: no cover
+            elif body is None:
+                body_bytes = b""  # pragma: no cover
+            elif isinstance(body, GeneratorType):
+                try:  # pragma: no cover
+                    chunk = body.send(None)
+                    if isinstance(chunk, str):
+                        chunk = chunk.encode("utf-8")
+                    return {"type": "http.request", "body": chunk, "more_body": True}
+                except StopIteration:  # pragma: no cover
+                    request_complete = True
+                    return {"type": "http.request", "body": b""}
+            else:
+                body_bytes = body
+    
+            request_complete = True
+            return {"type": "http.request", "body": body_bytes}
+    
+        async def send(message: Message) -> None:
+            nonlocal raw_kwargs, response_started, template, context
+    
+            if message["type"] == "http.response.start":
+                assert (
+                    not response_started
+                ), 'Received multiple "http.response.start" messages.'
+                raw_kwargs["status_code"] = message["status"]
+                raw_kwargs["headers"] = [
+                    (key.decode(), value.decode())
+                    for key, value in message.get("headers", [])
+                ]
+                response_started = True
+            elif message["type"] == "http.response.body":
+                assert (
+                    response_started
+                ), 'Received "http.response.body" without "http.response.start".'
+                assert (
+                    not response_complete.is_set()
+                ), 'Received "http.response.body" after response completed.'
+                body = message.get("body", b"")
+                more_body = message.get("more_body", False)
+                if request.method != "HEAD":
+                    raw_kwargs["stream"].write(body)
+                if not more_body:
+                    raw_kwargs["stream"].seek(0)
+                    response_complete.set()
+            elif message["type"] == "http.response.debug":
+                template = message["info"]["template"]
+                context = message["info"]["context"]
+    
+        try:
+            with self.portal_factory() as portal:
+                response_complete = portal.call(anyio.Event)
+                portal.call(self.app, scope, receive, send)
+        except BaseException as exc:
+            if self.raise_server_exceptions:
+                raise exc
+    
+        if self.raise_server_exceptions:
+>           assert response_started, "TestClient did not receive any response."
+E           AssertionError: TestClient did not receive any response.
+
+../../miniforge3/lib/python3.12/site-packages/starlette/testclient.py:375: AssertionError
+_________________ TestSecurityMeasures.test_error_sanitization _________________
+
+self = <test_security_measures.TestSecurityMeasures object at 0x107223c80>
+security_client = <tests.security.security_test_config.CompatibleTestClient object at 0x109ddea50>
+
+    def test_error_sanitization(self, security_client):
+        # Usar el cliente de prueba proporcionado por el fixture
+        client = security_client
+        """Prueba que los errores internos no expongan información sensible."""
+        # Intentar acceder a un endpoint que no existe para generar un error
+>       response = client.get("/non_existent_endpoint")
+
+tests/security/test_security_measures.py:221: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1053: in get
+    return self.request(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+../../miniforge3/lib/python3.12/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <starlette.testclient._TestClientTransport object at 0x109ddc800>
+request = <Request('GET', 'http://testserver/non_existent_endpoint')>
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        scheme = request.url.scheme
+        netloc = request.url.netloc.decode(encoding="ascii")
+        path = request.url.path
+        raw_path = request.url.raw_path
+        query = request.url.query.decode(encoding="ascii")
+    
+        default_port = {"http": 80, "ws": 80, "https": 443, "wss": 443}[scheme]
+    
+        if ":" in netloc:
+            host, port_string = netloc.split(":", 1)
+            port = int(port_string)
+        else:
+            host = netloc
+            port = default_port
+    
+        # Include the 'host' header.
+        if "host" in request.headers:
+            headers: list[tuple[bytes, bytes]] = []
+        elif port == default_port:  # pragma: no cover
+            headers = [(b"host", host.encode())]
+        else:  # pragma: no cover
+            headers = [(b"host", (f"{host}:{port}").encode())]
+    
+        # Include other request headers.
+        headers += [
+            (key.lower().encode(), value.encode())
+            for key, value in request.headers.multi_items()
+        ]
+    
+        scope: dict[str, typing.Any]
+    
+        if scheme in {"ws", "wss"}:
+            subprotocol = request.headers.get("sec-websocket-protocol", None)
+            if subprotocol is None:
+                subprotocols: typing.Sequence[str] = []
+            else:
+                subprotocols = [value.strip() for value in subprotocol.split(",")]
+            scope = {
+                "type": "websocket",
+                "path": unquote(path),
+                "raw_path": raw_path,
+                "root_path": self.root_path,
+                "scheme": scheme,
+                "query_string": query.encode(),
+                "headers": headers,
+                "client": None,
+                "server": [host, port],
+                "subprotocols": subprotocols,
+                "state": self.app_state.copy(),
+            }
+            session = WebSocketTestSession(self.app, scope, self.portal_factory)
+            raise _Upgrade(session)
+    
+        scope = {
+            "type": "http",
+            "http_version": "1.1",
+            "method": request.method,
+            "path": unquote(path),
+            "raw_path": raw_path,
+            "root_path": self.root_path,
+            "scheme": scheme,
+            "query_string": query.encode(),
+            "headers": headers,
+            "client": None,
+            "server": [host, port],
+            "extensions": {"http.response.debug": {}},
+            "state": self.app_state.copy(),
+        }
+    
+        request_complete = False
+        response_started = False
+        response_complete: anyio.Event
+        raw_kwargs: dict[str, typing.Any] = {"stream": io.BytesIO()}
+        template = None
+        context = None
+    
+        async def receive() -> Message:
+            nonlocal request_complete
+    
+            if request_complete:
+                if not response_complete.is_set():
+                    await response_complete.wait()
+                return {"type": "http.disconnect"}
+    
+            body = request.read()
+            if isinstance(body, str):
+                body_bytes: bytes = body.encode("utf-8")  # pragma: no cover
+            elif body is None:
+                body_bytes = b""  # pragma: no cover
+            elif isinstance(body, GeneratorType):
+                try:  # pragma: no cover
+                    chunk = body.send(None)
+                    if isinstance(chunk, str):
+                        chunk = chunk.encode("utf-8")
+                    return {"type": "http.request", "body": chunk, "more_body": True}
+                except StopIteration:  # pragma: no cover
+                    request_complete = True
+                    return {"type": "http.request", "body": b""}
+            else:
+                body_bytes = body
+    
+            request_complete = True
+            return {"type": "http.request", "body": body_bytes}
+    
+        async def send(message: Message) -> None:
+            nonlocal raw_kwargs, response_started, template, context
+    
+            if message["type"] == "http.response.start":
+                assert (
+                    not response_started
+                ), 'Received multiple "http.response.start" messages.'
+                raw_kwargs["status_code"] = message["status"]
+                raw_kwargs["headers"] = [
+                    (key.decode(), value.decode())
+                    for key, value in message.get("headers", [])
+                ]
+                response_started = True
+            elif message["type"] == "http.response.body":
+                assert (
+                    response_started
+                ), 'Received "http.response.body" without "http.response.start".'
+                assert (
+                    not response_complete.is_set()
+                ), 'Received "http.response.body" after response completed.'
+                body = message.get("body", b"")
+                more_body = message.get("more_body", False)
+                if request.method != "HEAD":
+                    raw_kwargs["stream"].write(body)
+                if not more_body:
+                    raw_kwargs["stream"].seek(0)
+                    response_complete.set()
+            elif message["type"] == "http.response.debug":
+                template = message["info"]["template"]
+                context = message["info"]["context"]
+    
+        try:
+            with self.portal_factory() as portal:
+                response_complete = portal.call(anyio.Event)
+                portal.call(self.app, scope, receive, send)
+        except BaseException as exc:
+            if self.raise_server_exceptions:
+                raise exc
+    
+        if self.raise_server_exceptions:
+>           assert response_started, "TestClient did not receive any response."
+E           AssertionError: TestClient did not receive any response.
+
+../../miniforge3/lib/python3.12/site-packages/starlette/testclient.py:375: AssertionError
+=============================== warnings summary ===============================
+../../miniforge3/lib/python3.12/site-packages/starlette/formparsers.py:12
+  /Users/aldoolivas/miniforge3/lib/python3.12/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/models/conversation.py:28: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator('age')
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/miniforge3/lib/python3.12/site-packages/pydantic/_internal/_config.py:295: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/miniforge3/lib/python3.12/site-packages/pydantic/_internal/_generate_schema.py:297: PydanticDeprecatedSince20: `json_encoders` is deprecated. See https://docs.pydantic.dev/2.10/concepts/serialization/#custom-serializers for alternatives. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    warnings.warn(
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/miniforge3/lib/python3.12/site-packages/pydantic/_internal/_config.py:345: UserWarning: Valid config keys have changed in V2:
+  * 'schema_extra' has been renamed to 'json_schema_extra'
+    warnings.warn(message, UserWarning)
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:21: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("role")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:28: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("timestamp")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:51: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("conversation_id")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:64: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("objection_type")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:79: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("conversation_id")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:92: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("need_category")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:108: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("conversation_id")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:129: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("conversation_id")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:136: PydanticDeprecatedSince20: Pydantic V1 style `@root_validator` validators are deprecated. You should migrate to Pydantic V2 style `@model_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @root_validator(skip_on_failure=True)
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:154: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("conversation_id")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:168: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("conversation_id")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:175: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("path_actions")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:196: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("status")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:204: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("model_params")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:223: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("model_type")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:238: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("model_name")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/models/predictive_models.py:245: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    @validator("training_config")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/services/objection_prediction_service.py:54: RuntimeWarning: coroutine 'ObjectionPredictionService._initialize_model' was never awaited
+    self._initialize_model()
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/services/needs_prediction_service.py:59: RuntimeWarning: coroutine 'NeedsPredictionService._initialize_model' was never awaited
+    self._initialize_model()
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/services/conversion_prediction_service.py:55: RuntimeWarning: coroutine 'ConversionPredictionService._initialize_model' was never awaited
+    self._initialize_model()
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/services/decision_engine_service.py:66: RuntimeWarning: coroutine 'DecisionEngineService._initialize_model' was never awaited
+    self._initialize_model()
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/main.py:157: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/miniforge3/lib/python3.12/site-packages/fastapi/applications.py:4495: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/src/api/main.py:182: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("shutdown")
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+tests/security/test_security_measures.py::TestSecurityMeasures::test_security_headers
+tests/security/test_security_measures.py::TestSecurityMeasures::test_token_expiration
+tests/security/test_security_measures.py::TestSecurityMeasures::test_invalid_token_rejection
+tests/security/test_security_measures.py::TestSecurityMeasures::test_expired_token_rejection
+tests/security/test_security_measures.py::TestSecurityMeasures::test_permission_enforcement
+tests/security/test_security_measures.py::TestSecurityMeasures::test_input_validation
+tests/security/test_security_measures.py::TestSecurityMeasures::test_error_sanitization
+  /Users/aldoolivas/miniforge3/lib/python3.12/site-packages/starlette/testclient.py:369: RuntimeWarning: coroutine 'FastAPI.__call__' was never awaited
+    portal.call(self.app, scope, receive, send)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_expired_token_rejection
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/tests/security/test_security_measures.py:134: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "exp": datetime.utcnow() - timedelta(minutes=5),  # Expirado hace 5 minutos
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_expired_token_rejection
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/tests/security/test_security_measures.py:135: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "iat": datetime.utcnow() - timedelta(hours=2),
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_permission_enforcement
+tests/security/test_security_measures.py::TestSecurityMeasures::test_permission_enforcement
+tests/security/test_security_measures.py::TestSecurityMeasures::test_input_validation
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/tests/security/security_test_config.py:105: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    expire = datetime.utcnow() + timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_permission_enforcement
+tests/security/test_security_measures.py::TestSecurityMeasures::test_permission_enforcement
+tests/security/test_security_measures.py::TestSecurityMeasures::test_input_validation
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/tests/security/security_test_config.py:112: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "iat": datetime.utcnow(),
+
+tests/security/test_security_measures.py::TestSecurityMeasures::test_input_validation
+  /Users/aldoolivas/Desktop/Agentes SKD_voz/tests/security/test_security_measures.py:196: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "timestamp": datetime.utcnow().isoformat()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+
+---------- coverage: platform darwin, python 3.12.9-final-0 ----------
+Name                                               Stmts   Miss  Cover   Missing
+--------------------------------------------------------------------------------
+src/__init__.py                                        0      0   100%
+src/agents/__init__.py                                 6      2    67%   6, 10
+src/agents/base_agent.py                              13     13     0%   4-32
+src/agents/mock_agent.py                              38     26    32%   16, 31-35, 69-100, 118
+src/agents/tools/__init__.py                           3      3     0%   2-10
+src/agents/tools/adaptive_tools.py                   102    102     0%   5-285
+src/agents/tools/program_tools.py                     31     31     0%   4-83
+src/agents/unified_agent.py                          129    129     0%   5-310
+src/api/__init__.py                                    0      0   100%
+src/api/main.py                                       75     28    63%   74-137, 155, 160-180, 185
+src/api/middleware/__init__.py                         0      0   100%
+src/api/middleware/error_handlers.py                  41     28    32%   38-50, 64-80, 101-122, 144-156
+src/api/middleware/rate_limiter.py                    93     79    15%   47-60, 74-84, 97-117, 123-142, 154-184, 198-224, 237-249
+src/api/models/__init__.py                             0      0   100%
+src/api/models/predictive_models.py                  174     71    59%   24-26, 31-35, 54-56, 67-70, 82-84, 95-98, 111-113, 132-134, 139-144, 157-159, 171-173, 178-187, 199-202, 207-212, 226-229, 241-243, 248-253
+src/api/routers/__init__.py                            0      0   100%
+src/api/routers/analytics.py                          47     31    34%   32-40, 53-61, 74-82, 95-99, 109-113
+src/api/routers/auth.py                               65     43    34%   91-165, 188-229, 252-280, 303-316
+src/api/routers/conversation.py                       87     55    37%   43-61, 68-89, 96-131, 138-156, 163-175
+src/api/routers/model_training.py                     67     45    33%   81-107, 133-155, 185-211, 237-250, 272-334
+src/api/routers/predictive.py                        125     76    39%   122-135, 163-176, 205-218, 246-259, 288-302, 330-343, 373-387, 417-432, 463-504, 531-539, 565-587, 617-646
+src/api/routers/qualification.py                      38     24    37%   24, 40-45, 63-68, 88-103
+src/auth/__init__.py                                   0      0   100%
+src/auth/auth_dependencies.py                         22      8    64%   34, 51, 76-77, 94-100
+src/auth/auth_utils.py                                49     22    55%   57-71, 89-96, 110-125
+src/auth/jwt_functions.py                             11      4    64%   23, 35, 49, 65
+src/auth/jwt_handler.py                               61     39    36%   42-63, 77-98, 114-125, 143-150
+src/conversation/__init__.py                           0      0   100%
+src/conversation/flows/__init__.py                     2      2     0%   2-4
+src/conversation/flows/basic_flow.py                  67     67     0%   6-284
+src/conversation/prompts/__init__.py                   2      2     0%   2-11
+src/conversation/prompts/base_prompts.py               6      6     0%   7-143
+src/conversation/prompts/unified_prompts.py            3      3     0%   5-170
+src/integrations/__init__.py                           0      0   100%
+src/integrations/elevenlabs/__init__.py                2      0   100%
+src/integrations/elevenlabs/voice.py                  74     36    51%   51-52, 67-69, 72, 85-93, 107-148, 163
+src/integrations/openai/__init__.py                    2      2     0%   2-4
+src/integrations/openai/engine.py                     71     71     0%   1-251
+src/integrations/supabase/__init__.py                  3      0   100%
+src/integrations/supabase/client.py                  134     63    53%   27-29, 40, 45-59, 63-66, 72-74, 78, 82-83, 87, 91-100, 104, 125, 136-137, 153-164, 168, 188, 192-202, 219-231
+src/integrations/supabase/resilient_client.py        126    102    19%   71-117, 129-171, 201-233, 256-275, 300-321, 344-363, 386-411, 433-448, 460-475
+src/models/__init__.py                                 0      0   100%
+src/models/conversation.py                            82     27    67%   30-32, 72-76, 79-83, 93-95, 99-103, 112-113, 122-124, 134-135
+src/models/qualification.py                           38      0   100%
+src/services/__init__.py                               0      0   100%
+src/services/advanced_sentiment_service.py           111     89    20%   106-149, 168-183, 196-229, 247-267, 283-303, 319-335, 348-368
+src/services/base_predictive_service.py               61     41    33%   57-72, 91-104, 121-143, 155-185, 203-215
+src/services/contextual_intent_service.py            165    132    20%   145-174, 187-200, 217-230, 246-270, 282, 291-292, 304-353, 374-396, 420-481, 510-554, 571-594
+src/services/conversation_analytics_service.py       212    191    10%   48-161, 177-350, 365-454, 466-469
+src/services/conversation_service.py                 295    253    14%   17, 78-118, 136-350, 363-527, 541-565, 577-625, 637-668
+src/services/conversion_prediction_service.py        148    123    17%   61-79, 98-162, 185-245, 266-302, 315-320, 336-483, 503-522, 534-584
+src/services/decision_engine_service.py              372    335    10%   72-85, 106-188, 215-337, 351-399, 415-486, 512-528, 548-663, 676-705, 715-746, 755-789, 798-823, 839-920, 942-1095, 1111-1141, 1153-1211
+src/services/enhanced_intent_analysis_service.py     171    134    22%   129-131, 169-242, 256-334, 346-369, 382-399, 416-434, 451-535
+src/services/entity_recognition_service.py           116     90    22%   114-144, 156-174, 186, 195-196, 208-238, 254-280, 293-327, 339-340, 350-355
+src/services/follow_up_service.py                     70     54    23%   65-99, 118-132, 147-179, 192-261, 281-298
+src/services/human_transfer_service.py                63     47    25%   66-74, 89-115, 127-141, 156-188, 200
+src/services/intent_analysis_service.py               50     37    26%   51-109, 127-145
+src/services/keyword_extraction_service.py           145    114    21%   131-143, 158-175, 191-216, 228-248, 263-290, 302-344, 356, 369-370, 383-388, 401-409, 421-426, 439-451, 470-504, 523-550
+src/services/model_training_service.py               155    135    13%   55-112, 127-169, 189-218, 233-278, 292-360, 373-411, 429-480
+src/services/needs_prediction_service.py             171    145    15%   65-82, 101-170, 184-255, 271-323, 338-457, 473-502, 514-552
+src/services/nlp_integration_service.py              138    111    20%   50-76, 96-123, 150, 159-165, 178-194, 208-241, 259-291, 308-362, 374-387
+src/services/objection_prediction_service.py         119     96    19%   60-77, 96-165, 179-210, 226-272, 285-343, 359-388, 400-438
+src/services/personalization_service.py               81     69    15%   64-90, 106-139, 152-172, 187-218, 232-248
+src/services/predictive_model_service.py             154    122    21%   56, 76-97, 109-115, 127-138, 156-175, 187-195, 213-232, 248-263, 277-313, 334-356, 372-383, 395-403, 415-429, 445-461
+src/services/qualification_service.py                128    107    16%   51-94, 106-133, 147-180, 192-223, 236-252, 265-290, 302-322
+src/services/question_classification_service.py      169    141    17%   145-149, 161-183, 195-214, 227-273, 290-314, 331-349, 372-405, 425-484, 505-537
+src/services/recommendation_service.py               204    179    12%   47-77, 89, 101-102, 118-217, 233-323, 335-426, 442-486, 502-553, 566-596
+src/services/sentiment_alert_service.py               98     79    19%   53-105, 117-125, 137-140, 162-244, 258-341
+src/services/utils/__init__.py                         5      0   100%
+src/services/utils/data_processing.py                 79     71    10%   25-47, 61-128, 144-171
+src/services/utils/recommendations.py                 77     71     8%   28-71, 87-174
+src/services/utils/scoring.py                         55     47    15%   24-44, 57-68, 81-108, 122-141
+src/services/utils/signal_detection.py                76     68    11%   25-62, 75-100, 112-147, 159-186
+src/utils/__init__.py                                  3      0   100%
+src/utils/cache_utils.py                             158    111    30%   39, 56, 81-82, 91-94, 103-110, 114-120, 134-161, 175-246, 255-275, 284-285, 297-302, 306-318
+src/utils/retry_utils.py                              77     64    17%   47-83, 105-119, 150-187, 209-223, 244-262, 284-294
+src/utils/structured_logging.py                       53     17    68%   42-66, 78-87, 136, 177-186
+--------------------------------------------------------------------------------
+TOTAL                                               5868   4513    23%
+
+=========================== short test summary info ============================
+FAILED tests/security/test_security_measures.py::TestSecurityMeasures::test_rate_limiting
+FAILED tests/security/test_security_measures.py::TestSecurityMeasures::test_security_headers
+FAILED tests/security/test_security_measures.py::TestSecurityMeasures::test_token_expiration
+FAILED tests/security/test_security_measures.py::TestSecurityMeasures::test_invalid_token_rejection
+FAILED tests/security/test_security_measures.py::TestSecurityMeasures::test_expired_token_rejection
+FAILED tests/security/test_security_measures.py::TestSecurityMeasures::test_permission_enforcement
+FAILED tests/security/test_security_measures.py::TestSecurityMeasures::test_input_validation
+FAILED tests/security/test_security_measures.py::TestSecurityMeasures::test_error_sanitization
+======================== 8 failed, 53 warnings in 3.52s ========================

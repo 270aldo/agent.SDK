@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NGX PRIME - Transforma Tu Cuerpo y Mente | Landing Page Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.6;
+            overflow-x: hidden;
+            background: #0a0a0a;
+            color: #ffffff;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(120, 199, 250, 0.3) 0%, transparent 50%);
+            animation: gradientShift 8s ease-in-out infinite;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .hero-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .hero-content h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, #ffffff, #f0f0f0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.2;
+        }
+
+        .hero-content .subtitle {
+            font-size: 1.3rem;
+            margin-bottom: 32px;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+
+        .hero-content .features {
+            margin-bottom: 40px;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+            font-size: 1.1rem;
+        }
+
+        .feature-icon {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            border-radius: 50%;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .cta-button {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 18px 36px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.3);
+            margin-right: 16px;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(255, 107, 107, 0.4);
+        }
+
+        .secondary-button {
+            background: transparent;
+            color: white;
+            padding: 18px 36px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .secondary-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .hero-visual {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .transformation-visual {
+            width: 400px;
+            height: 400px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .transformation-visual::before {
+            content: '💪';
+            font-size: 120px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* Stats Section */
+        .stats {
+            background: #111111;
+            padding: 80px 0;
+        }
+
+        .stats-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 40px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 32px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 1.1rem;
+            color: #cccccc;
+        }
+
+        /* Program Section */
+        .program {
+            padding: 100px 0;
+            background: linear-gradient(180deg, #111111 0%, #1a1a1a 100%);
+        }
+
+        .program-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            text-align: center;
+        }
+
+        .program h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, #ffffff, #cccccc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .program-description {
+            font-size: 1.2rem;
+            color: #cccccc;
+            margin-bottom: 60px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .program-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+            margin-bottom: 60px;
+        }
+
+        .program-feature {
+            padding: 40px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: left;
+        }
+
+        .program-feature h3 {
+            font-size: 1.5rem;
+            margin-bottom: 16px;
+            color: #667eea;
+        }
+
+        .program-feature p {
+            color: #cccccc;
+            line-height: 1.6;
+        }
+
+        /* Testimonials */
+        .testimonials {
+            padding: 100px 0;
+            background: #0a0a0a;
+        }
+
+        .testimonial-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 24px;
+            text-align: center;
+        }
+
+        .testimonial {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 32px;
+        }
+
+        .testimonial-text {
+            font-size: 1.2rem;
+            font-style: italic;
+            margin-bottom: 24px;
+            color: #ffffff;
+        }
+
+        .testimonial-author {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        /* Final CTA */
+        .final-cta {
+            padding: 100px 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            text-align: center;
+        }
+
+        .final-cta h2 {
+            font-size: 2.5rem;
+            margin-bottom: 24px;
+        }
+
+        .final-cta p {
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+
+        .urgency-timer {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 16px;
+            margin: 32px auto;
+            max-width: 300px;
+            backdrop-filter: blur(10px);
+        }
+
+        .timer-label {
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            opacity: 0.8;
+        }
+
+        .timer-display {
+            font-size: 2rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .hero-container {
+                grid-template-columns: 1fr;
+                gap: 40px;
+                text-align: center;
+            }
+
+            .hero-content h1 {
+                font-size: 2.5rem;
+            }
+
+            .transformation-visual {
+                width: 300px;
+                height: 300px;
+            }
+
+            .cta-button, .secondary-button {
+                width: 100%;
+                margin-bottom: 16px;
+                margin-right: 0;
+            }
+        }
+
+        /* NGX Voice Agent Integration Styles */
+        .voice-agent-trigger {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+        }
+
+        /* Scroll progress indicator */
+        .scroll-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+        }
+
+        .scroll-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <!-- Scroll Progress -->
+    <div class="scroll-progress">
+        <div class="scroll-progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1>Transforma Tu Cuerpo y Mente en 90 Días</h1>
+                <p class="subtitle">
+                    El único programa científicamente probado que te garantiza resultados reales 
+                    sin dietas extremas ni horas interminables en el gimnasio.
+                </p>
+                
+                <div class="features">
+                    <div class="feature">
+                        <div class="feature-icon">✓</div>
+                        <span>Plan 100% personalizado para tu estilo de vida</span>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">✓</div>
+                        <span>Resultados visibles en las primeras 2 semanas</span>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">✓</div>
+                        <span>Soporte 24/7 de expertos certificados</span>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">✓</div>
+                        <span>Garantía de satisfacción del 100%</span>
+                    </div>
+                </div>
+
+                <div class="hero-buttons">
+                    <button class="cta-button" onclick="scrollToProgram()">
+                        Conoce el Programa PRIME
+                    </button>
+                    <button class="secondary-button" onclick="openCalculator()">
+                        Calcula tu Potencial
+                    </button>
+                </div>
+            </div>
+            
+            <div class="hero-visual">
+                <div class="transformation-visual"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats">
+        <div class="stats-container">
+            <div class="stat-item">
+                <div class="stat-number">10,000+</div>
+                <div class="stat-label">Vidas Transformadas</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">98%</div>
+                <div class="stat-label">Tasa de Éxito</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">15kg</div>
+                <div class="stat-label">Pérdida Promedio</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">90</div>
+                <div class="stat-label">Días al Nuevo Tú</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Program Section -->
+    <section class="program" id="program">
+        <div class="program-container">
+            <h2>El Programa PRIME</h2>
+            <p class="program-description">
+                No es solo otro programa de fitness. Es un sistema completo de transformación 
+                basado en ciencia, diseñado específicamente para profesionales ocupados que 
+                quieren resultados reales sin sacrificar su estilo de vida.
+            </p>
+
+            <div class="program-features">
+                <div class="program-feature">
+                    <h3>🧬 Nutrición Inteligente</h3>
+                    <p>
+                        Olvídate de las dietas restrictivas. Nuestro sistema de nutrición 
+                        inteligente se adapta a tus preferencias y estilo de vida, 
+                        garantizando resultados sostenibles.
+                    </p>
+                </div>
+                <div class="program-feature">
+                    <h3>💪 Entrenamiento Eficiente</h3>
+                    <p>
+                        Sesiones de 30-45 minutos, 4 veces por semana. Maximiza tus resultados 
+                        con entrenamientos científicamente diseñados para tu nivel y objetivos.
+                    </p>
+                </div>
+                <div class="program-feature">
+                    <h3>🧠 Mindset de Campeón</h3>
+                    <p>
+                        La transformación real comienza en la mente. Desarrolla la mentalidad 
+                        y hábitos que garantizan el éxito a largo plazo.
+                    </p>
+                </div>
+                <div class="program-feature">
+                    <h3>📱 Tecnología Avanzada</h3>
+                    <p>
+                        App exclusiva con seguimiento en tiempo real, ajustes automáticos 
+                        y comunicación directa con tu coach personal.
+                    </p>
+                </div>
+            </div>
+
+            <button class="cta-button" onclick="triggerVoiceAgent()">
+                Quiero Mi Evaluación Gratuita
+            </button>
+        </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="testimonials">
+        <div class="testimonial-container">
+            <div class="testimonial">
+                <p class="testimonial-text">
+                    "En 12 semanas perdí 18 kilos y gané una confianza que no tenía desde hace años. 
+                    El programa se adaptó perfectamente a mi agenda de CEO."
+                </p>
+                <div class="testimonial-author">- Carlos Mendoza, CEO Tech Startup</div>
+            </div>
+            <div class="testimonial">
+                <p class="testimonial-text">
+                    "Después de 3 embarazos pensé que era imposible. NGX me demostró que nunca es tarde. 
+                    Recuperé mi cuerpo y mi energía."
+                </p>
+                <div class="testimonial-author">- Ana García, Madre de 3</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="final-cta">
+        <div class="program-container">
+            <h2>¿Listo para Tu Transformación?</h2>
+            <p>Solo quedan 7 espacios para este mes. No dejes pasar esta oportunidad.</p>
+            
+            <div class="urgency-timer">
+                <div class="timer-label">Oferta especial termina en:</div>
+                <div class="timer-display" id="countdown">24:00:00</div>
+            </div>
+
+            <button class="cta-button" onclick="triggerVoiceAgent('final-cta')">
+                Reservar Mi Lugar Ahora
+            </button>
+            <br><br>
+            <button class="secondary-button" onclick="triggerVoiceAgent('more-info')">
+                Necesito Más Información
+            </button>
+        </div>
+    </section>
+
+    <!-- NGX Voice Agent Integration -->
+    <script 
+        src="../src/embed/UniversalEmbed.js"
+        data-touchpoint="landing-page"
+        data-size="medium"
+        data-position="bottom-right"
+        data-company-name="NGX"
+        data-primary-color="#667eea"
+        data-secondary-color="#764ba2"
+        data-auto-show="false"
+        data-max-shows-per-session="2"
+        data-max-shows-per-day="3"
+    ></script>
+
+    <script>
+        // Scroll progress bar
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.pageYOffset;
+            const docHeight = document.body.offsetHeight - window.innerHeight;
+            const scrollPercent = (scrollTop / docHeight) * 100;
+            document.getElementById('progressBar').style.width = scrollPercent + '%';
+        });
+
+        // Countdown timer
+        function updateCountdown() {
+            const now = new Date();
+            const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+            const timeLeft = tomorrow - now;
+            
+            const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+            
+            document.getElementById('countdown').textContent = 
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        setInterval(updateCountdown, 1000);
+        updateCountdown();
+
+        // Helper functions
+        function scrollToProgram() {
+            document.getElementById('program').scrollIntoView({ 
+                behavior: 'smooth' 
+            });
+        }
+
+        function openCalculator() {
+            // Trigger voice agent with specific context
+            if (window.ngxVoiceAgent) {
+                window.ngxVoiceAgent.show();
+                window.ngxVoiceAgent.track('calculator_interest', {
+                    section: 'hero',
+                    intent: 'calculate_potential'
+                });
+            }
+        }
+
+        function triggerVoiceAgent(context = 'default') {
+            if (window.ngxVoiceAgent) {
+                window.ngxVoiceAgent.show();
+                window.ngxVoiceAgent.track('cta_clicked', {
+                    context: context,
+                    section: context.includes('final') ? 'final-cta' : 'program'
+                });
+            }
+        }
+
+        // Advanced trigger configurations
+        if (window.ngxVoiceAgent) {
+            // Listen for agent events
+            window.ngxVoiceAgent.on('show', () => {
+                console.log('🎯 Voice agent activated on landing page');
+            });
+
+            window.ngxVoiceAgent.on('trigger', (event) => {
+                console.log('🎯 Smart trigger fired:', event.type);
+                
+                // Custom trigger responses based on landing page context
+                if (event.type === 'exit-intent') {
+                    // Special exit-intent message for landing page
+                    window.ngxVoiceAgent.updateConfig({
+                        context: {
+                            customMessage: "¡Espera! Veo que estás a punto de irte. ¿Te puedo hacer una pregunta rápida que podría ahorrarte meses de frustración?"
+                        }
+                    });
+                }
+                
+                if (event.type === 'scroll' && event.context.scrollDepth > 75) {
+                    // High engagement trigger
+                    window.ngxVoiceAgent.updateConfig({
+                        context: {
+                            customMessage: "¡Increíble! Veo que realmente estás interesado en transformar tu vida. ¿Conversamos sobre tu situación específica?"
+                        }
+                    });
+                }
+            });
+
+            // Update agent config based on page behavior
+            setTimeout(() => {
+                const scrollDepth = (window.pageYOffset / (document.body.offsetHeight - window.innerHeight)) * 100;
+                const timeOnPage = Date.now() - performance.timing.navigationStart;
+                
+                if (scrollDepth > 50 && timeOnPage > 60000) { // 1 minute on page
+                    window.ngxVoiceAgent.updateConfig({
+                        behavior: {
+                            autoShow: true // Auto-show for engaged users
+                        }
+                    });
+                }
+            }, 60000);
+        }
+
+        // Track page engagement
+        let maxScroll = 0;
+        let engagementEvents = 0;
+
+        window.addEventListener('scroll', () => {
+            const scrollPercent = (window.pageYOffset / (document.body.offsetHeight - window.innerHeight)) * 100;
+            maxScroll = Math.max(maxScroll, scrollPercent);
+        });
+
+        ['click', 'mousemove', 'keydown'].forEach(eventType => {
+            document.addEventListener(eventType, () => {
+                engagementEvents++;
+            });
+        });
+
+        // Send engagement data to voice agent
+        setInterval(() => {
+            if (window.ngxVoiceAgent) {
+                window.ngxVoiceAgent.setState({
+                    maxScroll: maxScroll,
+                    engagementScore: Math.min(engagementEvents / 100, 1),
+                    pageType: 'landing-conversion',
+                    programInterest: document.querySelector('#program').getBoundingClientRect().top < window.innerHeight
+                });
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

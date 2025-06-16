@@ -133,7 +133,7 @@ class OptimizeFlowRequest(BaseModel):
             raise ValueError("El ID de conversación contiene caracteres no válidos")
         return v
     
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def validate_objectives(cls, values):
         """Valida que los pesos de los objetivos sumen aproximadamente 1."""
         objectives = values.get("current_objectives")

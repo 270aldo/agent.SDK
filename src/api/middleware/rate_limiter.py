@@ -7,7 +7,7 @@ protegiendo contra abusos y ataques de denegación de servicio.
 
 import time
 from fastapi import Request, Response, HTTPException
-from fastapi.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Dict, List, Tuple, Optional, Callable, Any
 import logging
 
@@ -111,8 +111,9 @@ class RateLimiter(BaseHTTPMiddleware):
                 # Aquí se podría verificar si el usuario es administrador
                 # Por ahora, simplemente devolvemos False
                 return False
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Error checking admin status for rate limit exemption: {e}")
+                return False
         
         return False
     

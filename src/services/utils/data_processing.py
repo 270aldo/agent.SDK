@@ -96,8 +96,10 @@ def extract_features_from_conversation(messages: List[Dict[str, Any]],
                     duration_seconds = (end_time - start_time).total_seconds()
                     features["conversation_features"]["duration_seconds"] = duration_seconds
                     features["conversation_features"]["avg_response_time"] = duration_seconds / (len(messages) - 1) if len(messages) > 1 else 0
-                except (ValueError, KeyError):
-                    pass
+                except (ValueError, KeyError) as e:
+                    logger.warning(f"Error parsing timestamps for conversation duration: {e}")
+                    features["conversation_features"]["duration_seconds"] = 0
+                    features["conversation_features"]["avg_response_time"] = 0
         
         # Extraer características del perfil del cliente
         if customer_profile:

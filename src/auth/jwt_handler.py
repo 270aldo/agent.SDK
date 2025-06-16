@@ -19,7 +19,11 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # Configuración de JWT
-JWT_SECRET = os.getenv("JWT_SECRET", "default_secret_key_change_in_production")
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    logger.error("JWT_SECRET environment variable is required but not set")
+    raise ValueError("JWT_SECRET environment variable must be set for security")
+
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 JWT_REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7"))

@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NGX PRIME - Transform Your Body & Mind</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800"><rect fill="%23667eea" width="1200" height="800"/><path fill="%23764ba2" d="M0,400 Q300,200 600,400 T1200,400 L1200,800 L0,800 Z"/></svg>');
+            background-size: cover;
+            background-position: center;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            color: white;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .hero h1 {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .hero .subtitle {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .cta-button {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+            border: none;
+            padding: 1.2rem 3rem;
+            font-size: 1.2rem;
+            color: white;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.3);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(255, 107, 107, 0.4);
+        }
+
+        /* Features Section */
+        .features {
+            padding: 5rem 2rem;
+            background: #f8f9fa;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .features h2 {
+            text-align: center;
+            font-size: 3rem;
+            margin-bottom: 3rem;
+            color: #333;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 3rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .feature-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        /* Transformation Section */
+        .transformation {
+            padding: 5rem 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+        }
+
+        .transformation h2 {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        /* Testimonials */
+        .testimonials {
+            padding: 5rem 2rem;
+            background: white;
+        }
+
+        .testimonials h2 {
+            text-align: center;
+            font-size: 3rem;
+            margin-bottom: 3rem;
+            color: #333;
+        }
+
+        .testimonial-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+
+        .testimonial {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 15px;
+            border-left: 5px solid #667eea;
+        }
+
+        .testimonial-text {
+            font-style: italic;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .testimonial-author {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        /* CTA Section */
+        .final-cta {
+            padding: 5rem 2rem;
+            background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+            color: white;
+            text-align: center;
+        }
+
+        .final-cta h2 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .final-cta p {
+            font-size: 1.3rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        /* Scroll Progress */
+        .scroll-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 0%;
+            height: 4px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            z-index: 1000;
+            transition: width 0.3s ease;
+        }
+
+        /* NGX Voice Agent Modal */
+        .ngx-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+
+        .ngx-modal {
+            background: white;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 700px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.5s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .ngx-modal-header {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .ngx-modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ngx-modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .ngx-modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .ngx-modal-subtitle {
+            opacity: 0.9;
+        }
+
+        .ngx-chat-container {
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .ngx-chat-messages {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .ngx-message {
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .ngx-message.user {
+            align-items: flex-end;
+        }
+
+        .ngx-message.assistant {
+            align-items: flex-start;
+        }
+
+        .ngx-message-content {
+            max-width: 85%;
+            padding: 1rem 1.25rem;
+            border-radius: 20px;
+            margin-bottom: 0.25rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .ngx-message.user .ngx-message-content {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .ngx-message.assistant .ngx-message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e9ecef;
+        }
+
+        .ngx-message-time {
+            font-size: 0.75rem;
+            color: #999;
+            padding: 0 0.75rem;
+        }
+
+        .ngx-chat-input {
+            border-top: 1px solid #e9ecef;
+            padding: 1.5rem;
+            background: white;
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .ngx-chat-input input {
+            flex: 1;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .ngx-chat-input input:focus {
+            border-color: #667eea;
+        }
+
+        .ngx-send-button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: transform 0.2s ease;
+        }
+
+        .ngx-send-button:hover {
+            transform: translateY(-1px);
+        }
+
+        .ngx-send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero .subtitle {
+                font-size: 1.2rem;
+            }
+
+            .features h2,
+            .transformation h2,
+            .testimonials h2,
+            .final-cta h2 {
+                font-size: 2rem;
+            }
+
+            .ngx-modal {
+                width: 95%;
+                margin: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Scroll Progress Bar -->
+    <div class="scroll-progress" id="scrollProgress"></div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Transform Your Body<br>& Unlock Your Potential</h1>
+            <p class="subtitle">Join thousands who've achieved their dream physique with NGX PRIME's science-based approach</p>
+            <button class="cta-button" onclick="showNGXModal()">Start Your Transformation</button>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <h2>Why NGX PRIME Works</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🧬</div>
+                    <h3>DNA-Based Training</h3>
+                    <p>Personalized workouts based on your genetic makeup for maximum results and minimal injury risk.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Precision Nutrition</h3>
+                    <p>Macro and micronutrient plans tailored to your metabolism, lifestyle, and fitness goals.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📱</div>
+                    <h3>AI-Powered Coaching</h3>
+                    <p>24/7 virtual coach that adapts your program in real-time based on your progress and feedback.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">👥</div>
+                    <h3>Expert Support</h3>
+                    <p>Direct access to certified trainers, nutritionists, and wellness experts whenever you need guidance.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Advanced Analytics</h3>
+                    <p>Detailed progress tracking with biomarker analysis and performance optimization insights.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🏆</div>
+                    <h3>Proven Results</h3>
+                    <p>95% success rate with our comprehensive approach to fitness, nutrition, and mindset coaching.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Transformation Section -->
+    <section class="transformation">
+        <div class="container">
+            <h2>Real Results, Real People</h2>
+            <p style="font-size: 1.2rem; margin-bottom: 2rem; opacity: 0.9;">Join the thousands who've transformed their lives with NGX PRIME</p>
+            
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">50,000+</div>
+                    <div class="stat-label">Lives Transformed</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">95%</div>
+                    <div class="stat-label">Success Rate</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">12 weeks</div>
+                    <div class="stat-label">Average to Goal</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">24/7</div>
+                    <div class="stat-label">Expert Support</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="testimonials">
+        <div class="container">
+            <h2>What Our Members Say</h2>
+            <div class="testimonial-grid">
+                <div class="testimonial">
+                    <div class="testimonial-text">
+                        "I lost 45 pounds and gained incredible energy. The DNA-based approach made all the difference - finally a program that worked with my body, not against it."
+                    </div>
+                    <div class="testimonial-author">— Sarah M., Executive</div>
+                </div>
+                <div class="testimonial">
+                    <div class="testimonial-text">
+                        "As a busy dad, I thought I'd never get back in shape. NGX PRIME's flexible approach fit my schedule perfectly. Down 30 pounds and stronger than ever!"
+                    </div>
+                    <div class="testimonial-author">— Mark T., Father of 3</div>
+                </div>
+                <div class="testimonial">
+                    <div class="testimonial-text">
+                        "The AI coaching is incredible. It's like having a personal trainer who knows exactly what I need, when I need it. Best investment I've ever made."
+                    </div>
+                    <div class="testimonial-author">— Jennifer L., Entrepreneur</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="final-cta">
+        <div class="container">
+            <h2>Your Transformation Starts Today</h2>
+            <p>Don't wait another day. Join NGX PRIME and become the best version of yourself.</p>
+            <button class="cta-button" onclick="showNGXModal()">Get Started Now</button>
+        </div>
+    </section>
+
+    <!-- NGX Voice Agent Modal -->
+    <div class="ngx-modal-overlay" id="ngxModalOverlay">
+        <div class="ngx-modal">
+            <div class="ngx-modal-header">
+                <button class="ngx-modal-close" onclick="hideNGXModal()">✕</button>
+                <div class="ngx-modal-title">🤖 NGX Personal Consultant</div>
+                <div class="ngx-modal-subtitle">Let's create your personalized transformation plan</div>
+            </div>
+            <div class="ngx-chat-container">
+                <div class="ngx-chat-messages" id="chatMessages">
+                    <div class="ngx-message assistant">
+                        <div class="ngx-message-content">
+                            Hi there! I'm your NGX personal consultant. I'm excited to help you start your transformation journey! 🚀
+                            <br><br>
+                            To create the perfect plan for you, I'd love to know: What's your main fitness goal right now?
+                        </div>
+                        <div class="ngx-message-time">Just now</div>
+                    </div>
+                </div>
+                <div class="ngx-chat-input">
+                    <input type="text" id="chatInput" placeholder="Tell me about your fitness goals...">
+                    <button class="ngx-send-button" onclick="sendMessage()" id="sendButton">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Scroll progress bar
+        window.addEventListener('scroll', () => {
+            const scrolled = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
+            document.getElementById('scrollProgress').style.width = scrolled + '%';
+            
+            // Trigger NGX modal at 70% scroll
+            if (scrolled >= 70 && !sessionStorage.getItem('ngxModalShown')) {
+                sessionStorage.setItem('ngxModalShown', 'true');
+                setTimeout(() => {
+                    showNGXModal();
+                }, 1000);
+            }
+        });
+
+        // NGX Voice Agent functionality
+        let conversationStep = 0;
+        let userProfile = {};
+
+        function showNGXModal() {
+            document.getElementById('ngxModalOverlay').style.display = 'flex';
+            document.getElementById('chatInput').focus();
+            
+            // Track modal opening
+            console.log('NGX Modal opened');
+        }
+
+        function hideNGXModal() {
+            document.getElementById('ngxModalOverlay').style.display = 'none';
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message
+            addMessageToChat('user', message);
+            input.value = '';
+            
+            // Update user profile based on conversation step
+            updateUserProfile(message);
+            
+            // Generate response
+            setTimeout(() => {
+                const response = generateResponse(message);
+                addMessageToChat('assistant', response);
+                
+                // Text-to-speech
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(response);
+                    utterance.rate = 0.9;
+                    utterance.pitch = 1.1;
+                    speechSynthesis.speak(utterance);
+                }
+                
+                conversationStep++;
+            }, 1500);
+        }
+
+        function updateUserProfile(message) {
+            const lowerMessage = message.toLowerCase();
+            
+            switch(conversationStep) {
+                case 0: // Primary goal
+                    if (lowerMessage.includes('weight') || lowerMessage.includes('lose')) {
+                        userProfile.goal = 'weight_loss';
+                    } else if (lowerMessage.includes('muscle') || lowerMessage.includes('gain')) {
+                        userProfile.goal = 'muscle_gain';
+                    } else if (lowerMessage.includes('strength')) {
+                        userProfile.goal = 'strength';
+                    } else {
+                        userProfile.goal = 'general_fitness';
+                    }
+                    break;
+                case 1: // Experience level
+                    if (lowerMessage.includes('beginner') || lowerMessage.includes('new')) {
+                        userProfile.experience = 'beginner';
+                    } else if (lowerMessage.includes('advanced') || lowerMessage.includes('experienced')) {
+                        userProfile.experience = 'advanced';
+                    } else {
+                        userProfile.experience = 'intermediate';
+                    }
+                    break;
+                case 2: // Time availability
+                    if (lowerMessage.includes('hour') || lowerMessage.includes('60')) {
+                        userProfile.timeAvailable = 'high';
+                    } else if (lowerMessage.includes('30') || lowerMessage.includes('half')) {
+                        userProfile.timeAvailable = 'medium';
+                    } else {
+                        userProfile.timeAvailable = 'low';
+                    }
+                    break;
+            }
+        }
+
+        function generateResponse(message) {
+            const responses = [
+                // Step 0: After goal
+                `Excellent choice! ${getUserGoalResponse(userProfile.goal)} 
+                
+                Now, what's your experience level with fitness? Are you just getting started, or do you have some training experience?`,
+                
+                // Step 1: After experience
+                `Perfect! I can see you're ${userProfile.experience === 'beginner' ? 'ready to start strong' : 'committed to taking your fitness to the next level'}. 
+                
+                How much time can you realistically dedicate to working out each day? Even 20-30 minutes can make a huge difference!`,
+                
+                // Step 2: After time
+                `That's perfect! With ${getTimeCommitmentResponse(userProfile.timeAvailable)}, you can definitely achieve amazing results.
+                
+                Based on what you've told me, I'd recommend our ${getRecommendedProgram()} program. It's specifically designed for people with your goals and schedule.
+                
+                Would you like me to connect you with one of our expert coaches who can create a personalized plan for you? They can also answer any specific questions you might have.`,
+                
+                // Step 3+: Continue conversation
+                `That's fantastic! I'm so excited for your transformation journey. Our coaches have helped thousands of people just like you achieve incredible results.
+                
+                I'm going to connect you with Sarah, one of our top coaches who specializes in ${userProfile.goal?.replace('_', ' ')} programs. She'll be able to create a detailed plan tailored specifically to your needs and schedule.
+                
+                In the meantime, would you like me to send you our free "Quick Start Guide" that you can begin implementing today?`
+            ];
+            
+            return responses[Math.min(conversationStep, responses.length - 1)];
+        }
+
+        function getUserGoalResponse(goal) {
+            switch(goal) {
+                case 'weight_loss':
+                    return "Weight loss is one of our most popular goals, and our members typically see 1-2 pounds of healthy fat loss per week.";
+                case 'muscle_gain':
+                    return "Building lean muscle is key to a strong, healthy body. Our members typically gain 5-10 pounds of muscle in their first 3 months.";
+                case 'strength':
+                    return "Strength training is the foundation of all fitness. You'll be amazed at how quickly your strength improves with the right program.";
+                default:
+                    return "General fitness is a great foundation! You'll improve in multiple areas - strength, endurance, and overall health.";
+            }
+        }
+
+        function getTimeCommitmentResponse(time) {
+            switch(time) {
+                case 'high':
+                    return "an hour or more per day";
+                case 'medium':
+                    return "30-45 minutes per day";
+                default:
+                    return "just 20-30 minutes per day";
+            }
+        }
+
+        function getRecommendedProgram() {
+            if (userProfile.goal === 'weight_loss') {
+                return "NGX LEAN";
+            } else if (userProfile.goal === 'muscle_gain') {
+                return "NGX BUILD";
+            } else if (userProfile.goal === 'strength') {
+                return "NGX STRONG";
+            } else {
+                return "NGX PRIME";
+            }
+        }
+
+        function addMessageToChat(role, content) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `ngx-message ${role}`;
+            
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            messageDiv.innerHTML = `
+                <div class="ngx-message-content">${content}</div>
+                <div class="ngx-message-time">${timeString}</div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Handle Enter key
+        document.getElementById('chatInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Close modal on overlay click
+        document.getElementById('ngxModalOverlay').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideNGXModal();
+            }
+        });
+
+        // Smooth scrolling for CTA buttons
+        document.querySelectorAll('.cta-button').forEach(button => {
+            button.addEventListener('click', function() {
+                console.log('CTA clicked - Show NGX Modal');
+            });
+        });
+
+        // Analytics
+        console.log('NGX Landing Page loaded');
+    </script>
+</body>
+</html>

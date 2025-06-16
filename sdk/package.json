@@ -1,0 +1,77 @@
+{
+  "name": "@ngx/voice-agent-mono",
+  "version": "1.0.0",
+  "description": "NGX Voice Agent SDK Monorepo",
+  "private": true,
+  "workspaces": [
+    "web",
+    "react",
+    "react-native",
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "npm run build:web && npm run build:react && npm run build:react-native",
+    "build:web": "cd web && npm run build",
+    "build:react": "cd react && npm run build",
+    "build:react-native": "cd react-native && npm run build",
+    "dev": "concurrently \"npm run dev:web\" \"npm run dev:react\"",
+    "dev:web": "cd web && npm run dev",
+    "dev:react": "cd react && npm run dev",
+    "test": "npm run test:web && npm run test:react",
+    "test:web": "cd web && npm test",
+    "test:react": "cd react && npm test",
+    "lint": "npm run lint:web && npm run lint:react && npm run lint:react-native",
+    "lint:web": "cd web && npm run lint",
+    "lint:react": "cd react && npm run lint",
+    "lint:react-native": "cd react-native && npm run lint",
+    "publish:all": "npm run build && npm run publish:web && npm run publish:react && npm run publish:react-native",
+    "publish:web": "cd web && npm publish",
+    "publish:react": "cd react && npm publish",
+    "publish:react-native": "cd react-native && npm publish",
+    "version:bump": "npm version patch --workspaces",
+    "clean": "npm run clean:web && npm run clean:react && npm run clean:react-native",
+    "clean:web": "cd web && rm -rf dist node_modules",
+    "clean:react": "cd react && rm -rf dist node_modules",
+    "clean:react-native": "cd react-native && rm -rf dist node_modules",
+    "install:all": "npm install && npm run install:workspaces",
+    "install:workspaces": "npm install --workspaces"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "lerna": "^7.4.2",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.1.0"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "pre-push": "npm test"
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{md,json}": [
+      "prettier --write"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ngx/voice-agent-sdk.git"
+  },
+  "keywords": [
+    "voice",
+    "agent",
+    "ai",
+    "conversational",
+    "sales",
+    "sdk",
+    "typescript",
+    "react",
+    "react-native"
+  ],
+  "author": "NGX",
+  "license": "MIT"
+}

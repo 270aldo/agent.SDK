@@ -11,6 +11,7 @@ import uuid
 from dotenv import load_dotenv
 
 from src.utils.structured_logging import StructuredLogger
+from src.utils.observability import init_observability
 
 from src.api.middleware.rate_limiter import RateLimiter, get_user_from_request
 from src.api.middleware.error_handlers import http_exception_handler, validation_exception_handler, internal_exception_handler
@@ -45,11 +46,18 @@ app = FastAPI(
     description="API para el Agente de Ventas NGX con IA conversacional",
     version="0.1.0",
 )
+# Inicializar observabilidad (trazas y métricas)
+init_observability(app)
 
 # Configurar CORS
+allowed_origins = os.getenv("ALLOWED_ORIGINS")
+if not allowed_origins:
+    logger.error("ALLOWED_ORIGINS environment variable is required but not set")
+    raise ValueError("ALLOWED_ORIGINS environment variable must be set for security")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("ALLOWED_ORIGINS", "*").split(",")],  # En producción, especificar dominios permitidos
+    allow_origins=allowed_origins.split(","),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept"],

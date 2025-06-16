@@ -36,7 +36,7 @@ class DecisionEngineService(BasePredictiveService):
     """
     
     def __init__(self, 
-                 supabase_client: ResilientSupabaseClient,
+                 supabase: ResilientSupabaseClient,
                  predictive_model_service: PredictiveModelService,
                  nlp_integration_service: NLPIntegrationService,
                  objection_prediction_service: ObjectionPredictionService,
@@ -46,7 +46,7 @@ class DecisionEngineService(BasePredictiveService):
         Inicializa el servicio de motor de decisiones.
         
         Args:
-            supabase_client: Cliente de Supabase para persistencia
+            supabase: Cliente de Supabase para persistencia
             predictive_model_service: Servicio base para modelos predictivos
             nlp_integration_service: Servicio de integración NLP
             objection_prediction_service: Servicio de predicción de objeciones
@@ -54,7 +54,7 @@ class DecisionEngineService(BasePredictiveService):
             conversion_prediction_service: Servicio de predicción de conversión
         """
         super().__init__(
-            supabase_client=supabase_client,
+            supabase=supabase,
             predictive_model_service=predictive_model_service,
             nlp_integration_service=nlp_integration_service,
             model_name="decision_engine_model",
@@ -683,7 +683,7 @@ class DecisionEngineService(BasePredictiveService):
             }
             
             # Almacenar el feedback en la base de datos usando el cliente de Supabase
-            await self.supabase_client.from_("feedback_logs")\
+            await self.supabase.from_("feedback_logs")\
                 .insert({
                     "conversation_id": conversation_id,
                     "model_name": self.model_name,
