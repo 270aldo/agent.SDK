@@ -45,7 +45,7 @@ class ObjectionPredictionService(BasePredictiveService):
             nlp_integration_service: Servicio de integración NLP
         """
         super().__init__(
-            supabase_client=supabase_client,
+            supabase=supabase_client,
             predictive_model_service=predictive_model_service,
             nlp_integration_service=nlp_integration_service,
             model_name="objection_prediction_model",

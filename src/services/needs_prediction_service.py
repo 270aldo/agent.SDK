@@ -49,7 +49,7 @@ class NeedsPredictionService(BasePredictiveService):
             entity_recognition_service: Servicio de reconocimiento de entidades
         """
         super().__init__(
-            supabase_client=supabase_client,
+            supabase=supabase_client,
             predictive_model_service=predictive_model_service,
             nlp_integration_service=nlp_integration_service,
             model_name="needs_prediction_model",

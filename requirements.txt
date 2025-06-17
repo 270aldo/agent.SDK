@@ -1,39 +1,33 @@
-# API y Servidor
-fastapi==0.103.1
-starlette==0.27.0  # Versión compatible con fastapi 0.103.1
-uvicorn==0.23.2
-pydantic==2.10.0
+# Core API Framework
+fastapi==0.115.6
+starlette==0.41.3
+uvicorn==0.32.1
+pydantic==2.10.5
 
-# OpenAI e IA
-openai>=1.81.0
-langchain==0.0.312
-anyio==3.7.1
+# HTTP Client and Async Support
+httpx==0.28.1
+anyio==4.9.0
 
-# Procesamiento de voz
+# AI and Language Processing
+openai==1.81.0
+openai-agents==0.0.16
 elevenlabs
+
+# Audio Processing
 librosa==0.10.1
-soundfile==0.12.1
+soundfile==0.13.1
 
-# Base de datos y caché
-sqlalchemy==2.0.22
-supabase
-asyncpg==0.28.0
+# Database
+supabase==2.13.0
+asyncpg==0.30.0
+sqlalchemy==2.0.25
 
-# Utilidades
-python-dotenv==1.0.0
-httpx==0.24.1  # Versión compatible con starlette 0.27.0
+# Utilities
+python-dotenv==1.0.1
 pyjwt==2.8.0
-tenacity==8.2.3
-
-# Observabilidad
-opentelemetry-api==1.23.0
-opentelemetry-sdk==1.23.0
-opentelemetry-exporter-otlp==1.23.0
-opentelemetry-instrumentation-fastapi==0.44b0
-opentelemetry-instrumentation-httpx==0.44b0
-opentelemetry-instrumentation-asyncpg==0.44b0
-opentelemetry-instrumentation-logging==0.44b0
+tenacity==9.0.0
 
 # Testing
-pytest==7.4.2
-pytest-asyncio==0.21.1 
+pytest==7.4.4
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0 

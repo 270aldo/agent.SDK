@@ -1,0 +1,25 @@
+# Development and Observability Dependencies
+# Install with: pip install -r requirements-dev.txt
+
+# Core requirements
+-r requirements.txt
+
+# Observability (Optional)
+opentelemetry-api==1.31.0
+opentelemetry-sdk==1.31.0
+opentelemetry-exporter-otlp==1.31.0
+opentelemetry-instrumentation-fastapi==0.52b1
+opentelemetry-instrumentation-httpx==0.52b1
+opentelemetry-instrumentation-asyncpg==0.52b1
+opentelemetry-instrumentation-logging==0.52b1
+
+# Development tools
+black==24.4.2
+isort==5.13.2
+flake8==7.1.1
+mypy==1.13.0
+
+# Additional testing tools
+pytest-xdist==3.5.0
+pytest-mock==3.12.0
+coverage==7.4.0

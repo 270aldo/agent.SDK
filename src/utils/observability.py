@@ -3,31 +3,44 @@
 Inicializa trazas distribuidas y métricas usando OpenTelemetry. Exporta en formato
 OTLP para ser consumido por Prometheus/Grafana u otros back-ends compatibles.
 """
-from typing import Optional
-
-from fastapi import FastAPI
-from opentelemetry import trace, metrics
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-try:
-    # Versión >=1.23.0
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-except ImportError:  # pragma: no cover
-    # Compatibilidad con versiones <1.23
-    from opentelemetry.sdk.trace.export import OTLPSpanExporter
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
-from opentelemetry.instrumentation.logging import LoggingInstrumentor
-from opentelemetry.sdk.metrics import MeterProvider
-try:
-    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader, OTLPMetricExporter
-except ImportError:
-    # Fallback for older versions or missing dependencies
-    PeriodicExportingMetricReader = None
-    OTLPMetricExporter = None
 import os
+from typing import Optional
+from fastapi import FastAPI
+
+# Importar OpenTelemetry de forma segura
+try:
+    from opentelemetry import trace, metrics
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    try:
+        # Versión >=1.23.0
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    except ImportError:  # pragma: no cover
+        # Compatibilidad con versiones <1.23
+        from opentelemetry.exporter.otlp.trace_exporter import OTLPSpanExporter
+    try:
+        from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+        from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
+        from opentelemetry.instrumentation.logging import LoggingInstrumentor
+    except ImportError:
+        HTTPXClientInstrumentor = None
+        AsyncPGInstrumentor = None
+        LoggingInstrumentor = None
+    try:
+        from opentelemetry.sdk.metrics import MeterProvider
+        from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader, OTLPMetricExporter
+    except ImportError:
+        MeterProvider = None
+        PeriodicExportingMetricReader = None
+        OTLPMetricExporter = None
+    OPENTELEMETRY_AVAILABLE = True
+except ImportError:
+    # OpenTelemetry no disponible
+    OPENTELEMETRY_AVAILABLE = False
+    trace = None
+    metrics = None
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,7 +49,9 @@ _OTEL_ENDPOINT_ENV = "OTEL_EXPORTER_OTLP_ENDPOINT"
 _DEFAULT_OTEL_ENDPOINT = "http://localhost:4317"
 
 
-def _create_resource() -> Resource:
+def _create_resource():
+    if not OPENTELEMETRY_AVAILABLE:
+        return None
     return Resource.create({
         "service.name": os.getenv("SERVICE_NAME", "ngx-sales-agent"),
         "service.version": os.getenv("SERVICE_VERSION", "0.1.0"),
@@ -53,6 +68,10 @@ def init_observability(app: FastAPI, endpoint: Optional[str] = None) -> None:
             variable de entorno `OTEL_EXPORTER_OTLP_ENDPOINT` o se usará el valor
             por defecto localhost.
     """
+    if not OPENTELEMETRY_AVAILABLE:
+        logger.warning("OpenTelemetry no disponible - observabilidad deshabilitada")
+        return
+        
     endpoint = endpoint or os.getenv(_OTEL_ENDPOINT_ENV, _DEFAULT_OTEL_ENDPOINT)
 
     # Traza
@@ -74,8 +93,11 @@ def init_observability(app: FastAPI, endpoint: Optional[str] = None) -> None:
 
     # Instrumentaciones automáticas
     FastAPIInstrumentor.instrument_app(app)
-    HTTPXClientInstrumentor().instrument()
-    AsyncPGInstrumentor().instrument()
-    LoggingInstrumentor().instrument(set_logging_format=True)
+    if HTTPXClientInstrumentor:
+        HTTPXClientInstrumentor().instrument()
+    if AsyncPGInstrumentor:
+        AsyncPGInstrumentor().instrument()
+    if LoggingInstrumentor:
+        LoggingInstrumentor().instrument(set_logging_format=True)
 
     logger.info("OpenTelemetry inicializado para FastAPI", extra={"otel_endpoint": endpoint})

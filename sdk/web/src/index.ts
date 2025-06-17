@@ -4,6 +4,13 @@ export { APIClient } from './core/APIClient';
 export { VoiceManager } from './core/VoiceManager';
 export { PlatformManager } from './core/PlatformManager';
 
+// Advanced Components
+export { EnergyBall } from './components/EnergyBall';
+export { ModernVoiceInterface } from './components/ModernVoiceInterface';
+export { SmartTriggerEngine } from './components/SmartTriggerEngine';
+export { UniversalEmbed } from './embed/UniversalEmbed';
+export { ContextualAISystem } from './ai/ContextualAISystem';
+
 // Type exports
 export type {
   NGXConfig,
