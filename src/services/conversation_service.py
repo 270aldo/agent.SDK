@@ -34,8 +34,8 @@ from src.services.empathy_engine_service import EmpathyEngineService
 from src.services.adaptive_personality_service import AdaptivePersonalityService
 from src.services.multi_voice_service import MultiVoiceService, SalesSection
 
-# Importar servicio HIE revolucionario
-from src.services.hie_sales_scripts_service import HIESalesScriptsService
+# Enhanced price objection handling service integrado con HIE
+from src.services.enhanced_price_objection_service import EnhancedPriceObjectionService
 
 # Configurar logging
 logger = logging.getLogger(__name__)
@@ -88,8 +88,8 @@ class ConversationService:
         # Inicializar servicio de detección de tier
         self.tier_detection_service = TierDetectionService()
         
-        # Inicializar servicio HIE revolucionario
-        self.hie_sales_scripts_service = HIESalesScriptsService()
+        # Inicializar servicio mejorado de manejo de objeciones integrado con HIE
+        self.price_objection_service = EnhancedPriceObjectionService()
         
         # Instancia de agente actual
         self._current_agent: Optional[AgentInterface] = None
@@ -1456,53 +1456,58 @@ class ConversationService:
             Dict con contexto HIE avanzado para ventas
         """
         try:
-            # Construir perfil del usuario para el servicio HIE
-            user_profile = self._build_user_profile_for_hie(state, message_text, emotional_context)
+            # Construir perfil del usuario basado en estado de conversación
+            user_profile = self._build_user_profile_from_state(state, message_text, emotional_context)
             
-            # Generar secuencia HIE completa usando el servicio revolucionario
-            hie_sequence = self.hie_sales_scripts_service.generate_complete_hie_sequence(user_profile)
+            # Detectar tier apropiado usando el tier detection service
+            tier_info = self.tier_detection_service.detect_optimal_tier(
+                user_profile.get('edad', 35),
+                user_profile.get('profession', ''),
+                message_text
+            )
             
-            # Determinar fase de la conversación para seleccionar script apropiado
-            conversation_phase = self._determine_hie_conversation_phase(state, message_text)
+            # Determinar fase de la conversación
+            conversation_phase = self._determine_conversation_phase(state, message_text)
             
-            # Seleccionar script específico para la fase actual
-            current_script = self._select_hie_script_for_phase(hie_sequence, conversation_phase)
+            # Detectar si hay objeción de precio para manejo específico
+            objection_detected = self._detect_price_objection(message_text)
             
-            # Detectar objeciones potenciales para preparar respuestas
-            potential_objections = self._detect_potential_objections(message_text)
-            
-            # Construir contexto HIE avanzado
+            # Construir contexto HIE (Hybrid Intelligence Engine) avanzado
             hie_context = {
-                "hie_revolutionary_system": {
-                    "core_message": "Sistema HIE (High Impact Efficiency) - tecnología imposible de clonar",
-                    "user_metrics": hie_sequence["metricas_hie"],
-                    "archetype": hie_sequence["arquetipo_detectado"],
-                    "biological_urgency": f"Gap biológico: {hie_sequence['metricas_hie']['gap_biologico']} puntos",
-                    "roi_projection": f"ROI biológico estimado: {hie_sequence['metricas_hie']['roi_biologico']} años"
+                "hybrid_intelligence_engine": {
+                    "core_message": "Hybrid Intelligence Engine - sistema de 11 agentes especializados imposible de clonar",
+                    "tier_detected": tier_info.get('tier', 'Pro'),
+                    "confidence": tier_info.get('confidence', 0.5),
+                    "pricing": tier_info.get('pricing', {}),
+                    "specialization": "11 agentes IA trabajando en conjunto para tu éxito"
                 },
-                "current_script": current_script,
                 "conversation_phase": conversation_phase,
-                "hie_sequence": hie_sequence,
-                "potential_objections": potential_objections,
-                "neurological_triggers": self._get_neurological_triggers_for_phase(conversation_phase),
-                "sales_barriers": self._identify_sales_barriers(message_text, state),
-                "urgency_factors": self._calculate_urgency_factors(hie_sequence["metricas_hie"], user_profile)
+                "tier_info": tier_info,
+                "price_objection_detected": objection_detected,
+                "user_profile": user_profile
             }
             
-            logger.info(f"HIE context generado para fase: {conversation_phase}, arquetipo: {hie_sequence['arquetipo_detectado']}")
+            # Si hay objeción de precio, agregar respuesta específica integrada con HIE
+            if objection_detected:
+                objection_response = self.price_objection_service.generate_hie_integrated_objection_response(
+                    message_text, user_profile, tier_info, tier_info.get('tier', 'Pro')
+                )
+                hie_context["price_objection_response"] = objection_response
+            
+            logger.info(f"HIE context generado para fase: {conversation_phase}, tier: {tier_info.get('tier', 'Pro')}")
             return hie_context
             
         except Exception as e:
             logger.error(f"Error construyendo contexto HIE: {e}")
             return self._generate_hie_fallback_context()
     
-    def _build_user_profile_for_hie(
+    def _build_user_profile_from_state(
         self, 
         state: ConversationState, 
         message_text: str, 
         emotional_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Construir perfil de usuario para el servicio HIE."""
+        """Construir perfil de usuario basado en el estado de conversación."""
         try:
             # Extraer información básica del estado
             customer_data = state.customer_data
