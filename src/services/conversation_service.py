@@ -25,6 +25,13 @@ from src.services.human_transfer_service import HumanTransferService
 from src.services.follow_up_service import FollowUpService
 from src.services.personalization_service import PersonalizationService
 from src.services.nlp_integration_service import NLPIntegrationService
+from src.services.program_router import ProgramRouter
+
+# Importar nuevos servicios de inteligencia emocional
+from src.services.emotional_intelligence_service import EmotionalIntelligenceService
+from src.services.empathy_engine_service import EmpathyEngineService
+from src.services.adaptive_personality_service import AdaptivePersonalityService
+from src.services.multi_voice_service import MultiVoiceService, SalesSection
 
 # Configurar logging
 logger = logging.getLogger(__name__)
@@ -62,6 +69,18 @@ class ConversationService:
         self.personalization_service = PersonalizationService()
         self.nlp_service = NLPIntegrationService()
         
+        # Inicializar servicios de inteligencia emocional
+        self.emotional_intelligence_service = EmotionalIntelligenceService(
+            nlp_service=self.nlp_service,
+            sentiment_service=None  # TODO: Initialize sentiment service if needed
+        )
+        self.empathy_engine_service = EmpathyEngineService()
+        self.adaptive_personality_service = AdaptivePersonalityService()
+        self.multi_voice_service = MultiVoiceService()
+        
+        # Inicializar router de programas para detección automática
+        self.program_router = ProgramRouter()
+        
         # Instancia de agente actual
         self._current_agent: Optional[AgentInterface] = None
         
@@ -72,15 +91,15 @@ class ConversationService:
     async def start_conversation(
         self, 
         customer_data: CustomerData, 
-        program_type: str = "PRIME",
+        program_type: Optional[str] = None,
         platform_info: Optional[PlatformInfo] = None
     ) -> ConversationState:
         """
-        Iniciar una nueva conversación multi-plataforma.
+        Iniciar una nueva conversación multi-plataforma con detección automática de programa.
         
         Args:
             customer_data: Datos del cliente
-            program_type: Tipo de programa ("PRIME" o "LONGEVITY")
+            program_type: Tipo de programa ("PRIME" o "LONGEVITY"), opcional - se detecta automáticamente si no se proporciona
             platform_info: Información de la plataforma (opcional)
             
         Returns:
@@ -98,6 +117,45 @@ class ConversationService:
                     f"Solo se permite una llamada cada 48 horas. "
                     f"Disponible en {cooldown_status['hours_remaining']} horas"
                 )
+            
+            # Detectar programa automáticamente si no se especificó
+            if not program_type:
+                logger.info(f"Iniciando detección automática de programa para cliente: {customer_data.name}")
+                
+                # Convertir CustomerData a diccionario para el router
+                customer_data_dict = {
+                    "id": customer_data.id,
+                    "name": customer_data.name,
+                    "age": getattr(customer_data, 'age', None),
+                    "interests": getattr(customer_data, 'interests', [])
+                }
+                
+                # Determinar programa usando el router
+                program_decision = await self.program_router.determine_program(
+                    customer_data=customer_data_dict,
+                    initial_message="",  # Sin mensaje inicial por ahora
+                    conversation_context=None
+                )
+                
+                # Usar la recomendación del router
+                if program_decision.recommended_program == "HYBRID":
+                    # Para casos híbridos, defaultear a PRIME si es menor de 50, LONGEVITY si es mayor
+                    customer_age = customer_data_dict.get("age")
+                    if customer_age and customer_age >= 50:
+                        program_type = "LONGEVITY"
+                    else:
+                        program_type = "PRIME"
+                    logger.info(f"Caso híbrido detectado, asignando {program_type} basado en edad")
+                else:
+                    program_type = program_decision.recommended_program
+                
+                logger.info(
+                    f"Programa detectado automáticamente: {program_type} "
+                    f"(confianza: {program_decision.confidence_score:.2f}, "
+                    f"reasoning: {program_decision.reasoning})"
+                )
+            else:
+                logger.info(f"Usando programa especificado manualmente: {program_type}")
             
             # Establecer o crear contexto de plataforma
             if platform_info:
@@ -254,8 +312,29 @@ class ConversationService:
             if not self._current_agent:
                 await self._restore_agent_from_state(state)
             
-            # Procesar mensaje con el agente
-            response_message = await self._process_with_agent(message_text, state)
+            # Verificar si debemos cambiar de programa basado en nueva información
+            await self._check_program_switch(message_text, state)
+            
+            # Verificar si debemos forzar análisis de perfil en los primeros 60 segundos
+            await self._check_forced_profile_analysis(state)
+            
+            # Realizar análisis emocional del mensaje del usuario
+            emotional_profile = await self._analyze_emotional_state(message_text, conversation_id, state)
+            
+            # Analizar personalidad del usuario
+            personality_profile = await self._analyze_personality(conversation_id, state, emotional_profile)
+            
+            # Generar respuesta empática usando el motor de empatía
+            empathic_response = await self._generate_empathic_response(
+                emotional_profile, personality_profile, state, message_text
+            )
+            
+            # Procesar mensaje con el agente usando contexto emocional
+            response_message = await self._process_with_agent(message_text, state, {
+                'emotional_profile': emotional_profile,
+                'personality_profile': personality_profile,
+                'empathic_guidance': empathic_response
+            })
             
             # Realizar análisis de intención si está habilitado
             if check_intent:
@@ -276,8 +355,10 @@ class ConversationService:
                 audio_response = await self._generate_audio(state.messages[-1].content)
                 return state, audio_response
             
-            # Generar audio para la respuesta
-            audio_response = await self._generate_audio(response_message)
+            # Generar audio para la respuesta usando multi-voice service
+            audio_response = await self._generate_adaptive_audio(
+                response_message, state, emotional_profile, personality_profile, empathic_response
+            )
             
             # Guardar estado actualizado
             await self._save_conversation_state(state)
@@ -630,7 +711,7 @@ class ConversationService:
             logger.error(f"Error restaurando agente: {e}")
             raise RuntimeError(f"No se pudo restaurar el agente: {str(e)}") from e
     
-    async def _process_with_agent(self, message_text: str, state: ConversationState) -> str:
+    async def _process_with_agent(self, message_text: str, state: ConversationState, emotional_context: Optional[Dict[str, Any]] = None) -> str:
         """Procesar mensaje con el agente actual."""
         try:
             # Preparar contexto para el agente
@@ -645,6 +726,12 @@ class ConversationService:
                 "platform_info": self.platform_context.platform_info.to_dict() if self.platform_context else {},
                 "conversation_config": self.platform_context.conversation_config.__dict__ if self.platform_context else {}
             }
+            
+            # Añadir contexto emocional si está disponible
+            if emotional_context:
+                context.update({
+                    "emotional_intelligence": emotional_context
+                })
             
             # Procesar mensaje con el agente
             response = await self._current_agent.process_message(message_text, context)
@@ -790,14 +877,14 @@ class ConversationService:
             return True  # En caso de error, continuar por seguridad
     
     async def _generate_audio(self, text: str) -> BytesIO:
-        """Generar audio para el texto dado."""
+        """Generar audio básico para el texto dado (método de fallback)."""
         try:
             # Verificar si la síntesis de voz está habilitada
             if not self.platform_context.conversation_config.enable_voice:
                 # Retornar audio vacío si no está habilitado
                 return BytesIO()
             
-            # Generar audio usando ElevenLabs
+            # Generar audio usando ElevenLabs básico
             audio_response = await asyncio.to_thread(
                 lambda: voice_engine.text_to_speech(text)
             )
@@ -809,6 +896,130 @@ class ConversationService:
             # Retornar audio vacío en caso de error
             return BytesIO()
     
+    async def _generate_adaptive_audio(
+        self,
+        text: str,
+        state: ConversationState,
+        emotional_profile: Any,
+        personality_profile: Any,
+        empathy_response: Any
+    ) -> BytesIO:
+        """
+        Generar audio adaptativo usando el sistema multi-voice.
+        
+        Args:
+            text: Texto a convertir a voz
+            state: Estado actual de la conversación
+            emotional_profile: Perfil emocional del usuario
+            personality_profile: Perfil de personalidad del usuario
+            empathy_response: Respuesta empática generada
+            
+        Returns:
+            BytesIO: Stream de audio adaptativo
+        """
+        try:
+            # Verificar si la síntesis de voz está habilitada
+            if not self.platform_context.conversation_config.enable_voice:
+                return BytesIO()
+            
+            # Determinar sección de venta basada en el estado de conversación
+            sales_section = self._determine_sales_section(state)
+            
+            # Preparar contexto para multi-voice
+            voice_context = {
+                "conversation_id": state.id,
+                "program_type": state.program_type,
+                "voice_gender": "male",  # TODO: Could be configurable per customer
+                "platform_source": self.platform_context.platform_info.source.value if self.platform_context else "unknown",
+                "triggers": empathy_response.intro_phrase[:50] if empathy_response else ""
+            }
+            
+            # Generar respuesta adaptativa
+            multi_voice_response = await self.multi_voice_service.generate_adaptive_voice_response(
+                text=text,
+                sales_section=sales_section,
+                emotional_profile=emotional_profile,
+                personality_profile=personality_profile,
+                empathy_response=empathy_response,
+                context=voice_context
+            )
+            
+            # Guardar insights de voz en el estado
+            if not hasattr(state, 'voice_insights'):
+                state.voice_insights = []
+            
+            state.voice_insights.append({
+                'timestamp': datetime.now().isoformat(),
+                'sales_section': sales_section.value,
+                'voice_persona': multi_voice_response.voice_config_used.persona.value,
+                'emotional_alignment': multi_voice_response.emotional_alignment,
+                'personality_match': multi_voice_response.personality_match,
+                'adaptation_reason': multi_voice_response.adaptation_reason
+            })
+            
+            logger.info(
+                f"Audio adaptativo generado: {multi_voice_response.voice_config_used.persona.value}, "
+                f"alineación emocional: {multi_voice_response.emotional_alignment:.2f}"
+            )
+            
+            return multi_voice_response.audio_stream
+            
+        except Exception as e:
+            logger.error(f"Error generando audio adaptativo: {e}")
+            # Fallback a audio básico
+            return await self._generate_audio(text)
+    
+    def _determine_sales_section(self, state: ConversationState) -> SalesSection:
+        """
+        Determinar la sección de venta actual basada en el estado de conversación.
+        
+        Args:
+            state: Estado de la conversación
+            
+        Returns:
+            SalesSection: Sección identificada
+        """
+        try:
+            # Analizar número de mensajes
+            message_count = len(state.messages)
+            
+            # Analizar fase actual si está disponible
+            current_phase = getattr(state, 'phase', 'active')
+            
+            # Determinar sección basada en múltiples factores
+            if message_count <= 2:
+                return SalesSection.OPENING
+            elif current_phase == "human_transfer":
+                return SalesSection.FOLLOW_UP
+            elif current_phase == "ended":
+                return SalesSection.CLOSING
+            elif message_count <= 6:
+                return SalesSection.DISCOVERY
+            elif message_count <= 10:
+                # Buscar indicadores de objeciones en mensajes recientes
+                recent_messages = [msg.content.lower() for msg in state.messages[-3:] if msg.role == "user"]
+                objection_keywords = ["pero", "no estoy seguro", "caro", "precio", "no puedo", "problema"]
+                
+                if any(keyword in " ".join(recent_messages) for keyword in objection_keywords):
+                    return SalesSection.OBJECTION_HANDLING
+                else:
+                    return SalesSection.PRESENTATION
+            elif message_count <= 15:
+                # Fase avanzada - buscar indicadores de cierre
+                recent_messages = [msg.content.lower() for msg in state.messages[-3:] if msg.role == "user"]
+                closing_keywords = ["listo", "quiero", "empezar", "cuando", "cómo procedo"]
+                
+                if any(keyword in " ".join(recent_messages) for keyword in closing_keywords):
+                    return SalesSection.CLOSING
+                else:
+                    return SalesSection.OBJECTION_HANDLING
+            else:
+                return SalesSection.CLOSING
+                
+        except Exception as e:
+            logger.error(f"Error determinando sección de venta: {e}")
+            return SalesSection.DISCOVERY  # Default seguro
+    
     def _generate_closing_message(self, end_reason: str) -> str:
         """Generar mensaje de cierre basado en la razón."""
         closing_messages = {
@@ -818,4 +1029,390 @@ class ConversationService:
             'default': "Gracias por conversar con nosotros. ¡Que tengas un excelente día!"
         }
         
-        return closing_messages.get(end_reason, closing_messages['default']) 
+        return closing_messages.get(end_reason, closing_messages['default'])
+    
+    async def _analyze_emotional_state(
+        self, 
+        message_text: str, 
+        conversation_id: str, 
+        state: ConversationState
+    ) -> Any:
+        """
+        Analizar el estado emocional del usuario en el mensaje actual.
+        
+        Args:
+            message_text: Texto del mensaje del usuario
+            conversation_id: ID de la conversación
+            state: Estado actual de la conversación
+            
+        Returns:
+            EmotionalProfile: Perfil emocional del usuario
+        """
+        try:
+            # Preparar historial de conversación para contexto
+            conversation_history = [
+                {"role": msg.role, "content": msg.content}
+                for msg in state.messages[-10:]  # Últimos 10 mensajes para contexto
+            ]
+            
+            # Analizar estado emocional
+            emotional_profile = await self.emotional_intelligence_service.analyze_emotional_state(
+                messages=conversation_history,
+                customer_profile=state.customer_data if hasattr(state, 'customer_data') else None
+            )
+            
+            # Guardar en el estado de la conversación
+            if not hasattr(state, 'emotional_journey'):
+                state.emotional_journey = []
+            
+            state.emotional_journey.append({
+                'timestamp': datetime.now().isoformat(),
+                'emotional_state': emotional_profile.primary_emotion.value,
+                'confidence': emotional_profile.confidence,
+                'secondary_emotions': {k.value: v for k, v in emotional_profile.secondary_emotions.items()},
+                'triggers': emotional_profile.triggers,
+                'stability_score': emotional_profile.stability_score
+            })
+            
+            logger.info(f"Estado emocional analizado para {conversation_id}: {emotional_profile.primary_emotion.value}")
+            return emotional_profile
+            
+        except Exception as e:
+            logger.error(f"Error analizando estado emocional: {e}")
+            # Retornar perfil emocional neutral por defecto
+            from src.integrations.elevenlabs.advanced_voice import EmotionalState
+            from src.services.emotional_intelligence_service import EmotionalProfile
+            return EmotionalProfile(
+                primary_emotion=EmotionalState.NEUTRAL,
+                confidence=0.5,
+                secondary_emotions={},
+                emotional_journey=[],
+                triggers=[],
+                emotional_velocity=0.0,
+                stability_score=1.0
+            )
+    
+    async def _analyze_personality(
+        self, 
+        conversation_id: str, 
+        state: ConversationState,
+        emotional_profile: Any
+    ) -> Any:
+        """
+        Analizar la personalidad del usuario basándose en la conversación.
+        
+        Args:
+            conversation_id: ID de la conversación
+            state: Estado actual de la conversación
+            emotional_profile: Perfil emocional del usuario
+            
+        Returns:
+            PersonalityProfile: Perfil de personalidad del usuario
+        """
+        try:
+            # Preparar mensajes de conversación
+            conversation_messages = [
+                {"role": msg.role, "content": msg.content}
+                for msg in state.messages
+            ]
+            
+            # Analizar personalidad
+            personality_profile = await self.adaptive_personality_service.analyze_personality(
+                messages=conversation_messages,
+                customer_profile=state.customer_data if hasattr(state, 'customer_data') else None,
+                behavioral_data=None
+            )
+            
+            # Guardar en el estado de la conversación
+            state.personality_insights = {
+                'communication_style': personality_profile.communication_style.value,
+                'formality_preference': personality_profile.formality_preference,
+                'detail_preference': personality_profile.detail_preference,
+                'pace_preference': personality_profile.pace_preference,
+                'confidence_score': personality_profile.confidence_score
+            }
+            
+            logger.info(f"Personalidad analizada para {conversation_id}: {personality_profile.communication_style.value}")
+            return personality_profile
+            
+        except Exception as e:
+            logger.error(f"Error analizando personalidad: {e}")
+            # Retornar perfil de personalidad neutral por defecto
+            from src.services.adaptive_personality_service import (
+                PersonalityProfile, PersonalityTrait, CommunicationStyle
+            )
+            return PersonalityProfile(
+                communication_style=CommunicationStyle.AMIABLE,
+                primary_traits={
+                    PersonalityTrait.OPENNESS: 0.5,
+                    PersonalityTrait.CONSCIENTIOUSNESS: 0.5,
+                    PersonalityTrait.EXTRAVERSION: 0.5,
+                    PersonalityTrait.AGREEABLENESS: 0.5,
+                    PersonalityTrait.NEUROTICISM: 0.5
+                },
+                decision_style="collaborative",
+                risk_tolerance=0.5,
+                pace_preference="moderate",
+                detail_orientation=0.5,
+                social_preference="balanced"
+            )
+    
+    async def _generate_empathic_response(
+        self, 
+        emotional_profile: Any, 
+        personality_profile: Any,
+        state: ConversationState,
+        user_message: str
+    ) -> Any:
+        """
+        Generar respuesta empática basada en el perfil emocional y de personalidad.
+        
+        Args:
+            emotional_profile: Perfil emocional del usuario
+            personality_profile: Perfil de personalidad del usuario
+            state: Estado actual de la conversación
+            user_message: Mensaje actual del usuario
+            
+        Returns:
+            EmpathicResponse: Respuesta empática generada
+        """
+        try:
+            # Preparar contexto de conversación
+            conversation_context = {
+                'user_message': user_message,
+                'conversation_history': [
+                    {"role": msg.role, "content": msg.content}
+                    for msg in state.messages[-5:]
+                ],
+                'program_type': state.program_type,
+                'conversation_phase': getattr(state, 'phase', 'active'),
+                'personality_profile': personality_profile,
+                'platform_context': self.platform_context.platform_info.source.value if self.platform_context else 'unknown'
+            }
+            
+            # Determinar objetivo de ventas basado en el programa
+            sales_objective = f"Promocionar {state.program_type} de manera empática y personalizada"
+            
+            # Obtener respuestas previas para evitar repetición
+            previous_responses = [
+                msg.content for msg in state.messages[-3:] 
+                if msg.role == "assistant"
+            ]
+            
+            # Generar respuesta empática
+            empathic_response = await self.empathy_engine_service.generate_empathetic_response(
+                emotional_profile=emotional_profile,
+                original_message=user_message,
+                context=conversation_context,
+                cultural_context=None  # Could be inferred from customer data
+            )
+            
+            # Guardar insights empáticos en el estado
+            if not hasattr(state, 'empathy_insights'):
+                state.empathy_insights = []
+            
+            state.empathy_insights.append({
+                'timestamp': datetime.now().isoformat(),
+                'technique': empathic_response.technique_used.value,
+                'emotional_tone': empathic_response.emotional_tone,
+                'voice_persona': empathic_response.voice_persona.value,
+                'intro_phrase': empathic_response.intro_phrase[:100]  # Truncate for storage
+            })
+            
+            logger.info(f"Respuesta empática generada para {state.id}: {empathic_response.technique_used.value}")
+            return empathic_response
+            
+        except Exception as e:
+            logger.error(f"Error generando respuesta empática: {e}")
+            # Retornar respuesta empática básica por defecto
+            from src.services.empathy_engine_service import EmpathyTechnique, EmpathyResponse
+            from src.integrations.elevenlabs.advanced_voice import VoicePersona
+            return EmpathyResponse(
+                intro_phrase="Entiendo tu perspectiva",
+                core_message="Es natural que tengas esas preocupaciones",
+                closing_phrase="¿Hay algo específico que te preocupa?",
+                technique_used=EmpathyTechnique.VALIDATION,
+                voice_persona=VoicePersona.CONSULTANT,
+                emotional_tone="empático y comprensivo"
+            )
+    
+    async def _check_program_switch(self, message_text: str, state: ConversationState) -> None:
+        """
+        Verificar si debemos cambiar de programa basado en nueva información del usuario.
+        
+        Args:
+            message_text: Nuevo mensaje del usuario
+            state: Estado actual de la conversación
+        """
+        try:
+            # Solo verificar cambio después de los primeros mensajes para evitar switches prematuros
+            if len(state.messages) < 4:
+                return
+            
+            # Obtener historial de conversación para contexto
+            conversation_history = [
+                {"role": msg.role, "content": msg.content}
+                for msg in state.messages[-5:]  # Últimos 5 mensajes para contexto
+            ]
+            
+            # Verificar si debemos cambiar de programa
+            should_switch, new_decision = await self.program_router.should_switch_program(
+                current_program=state.program_type,
+                new_information=message_text,
+                conversation_history=conversation_history
+            )
+            
+            if should_switch and new_decision:
+                old_program = state.program_type
+                state.program_type = new_decision.recommended_program
+                
+                # Añadir mensaje explicativo del cambio
+                switch_message = (
+                    f"Entiendo mejor tus necesidades ahora. Basándome en lo que me has contado, "
+                    f"creo que NGX {new_decision.recommended_program} sería perfecto para ti. "
+                    f"Permíteme contarte más sobre este programa específico."
+                )
+                
+                state.add_message(role="assistant", content=switch_message)
+                
+                # Guardar información del switch para analytics
+                if not hasattr(state, 'program_switches'):
+                    state.program_switches = []
+                
+                state.program_switches.append({
+                    'timestamp': datetime.now().isoformat(),
+                    'from_program': old_program,
+                    'to_program': new_decision.recommended_program,
+                    'confidence': new_decision.confidence_score,
+                    'reasoning': new_decision.reasoning,
+                    'trigger_message': message_text[:100]  # Primeros 100 caracteres
+                })
+                
+                logger.info(
+                    f"Programa cambiado automáticamente de {old_program} a {new_decision.recommended_program} "
+                    f"en conversación {state.id} (confianza: {new_decision.confidence_score:.2f})"
+                )
+                
+        except Exception as e:
+            logger.error(f"Error verificando cambio de programa: {e}")
+            # No hacer nada en caso de error - continuar con programa actual
+    
+    async def _check_forced_profile_analysis(self, state: ConversationState) -> None:
+        """
+        Verificar si debemos forzar análisis de perfil en los primeros 60 segundos.
+        
+        Args:
+            state: Estado actual de la conversación
+        """
+        try:
+            # Solo intentar si tenemos un agente unificado
+            if not self._current_agent or not hasattr(self._current_agent, 'should_force_profile_analysis'):
+                return
+            
+            # Verificar si debemos forzar análisis
+            if not self._current_agent.should_force_profile_analysis():
+                return
+            
+            logger.info(f"Iniciando análisis forzado de perfil para conversación {state.id}")
+            
+            # Obtener contexto para análisis forzado
+            analysis_context = self._current_agent.get_profile_analysis_context()
+            
+            # Preparar transcripción completa para análisis
+            conversation_transcript = "\n".join([
+                f"{msg.role}: {msg.content}" 
+                for msg in state.messages[-10:]  # Últimos 10 mensajes
+            ])
+            
+            # Realizar análisis usando las herramientas adaptativas existentes
+            try:
+                # Usar la herramienta de análisis de perfil del cliente
+                from src.agents.tools.adaptive_tools import analyze_customer_profile
+                
+                analysis_result = await analyze_customer_profile(
+                    transcript=conversation_transcript,
+                    customer_age=state.customer_data.get('age') if hasattr(state, 'customer_data') else None
+                )
+                
+                # Procesar resultados en el agente
+                self._current_agent.process_forced_analysis_result(analysis_result)
+                
+                # Guardar información del análisis forzado en el estado
+                if not hasattr(state, 'forced_analysis_log'):
+                    state.forced_analysis_log = []
+                
+                state.forced_analysis_log.append({
+                    'timestamp': datetime.now().isoformat(),
+                    'trigger_time': analysis_context['elapsed_seconds'],
+                    'previous_confidence': analysis_context['current_confidence'],
+                    'analysis_result': {
+                        'recommended_program': analysis_result.get('recommended_program', 'UNKNOWN'),
+                        'confidence_score': analysis_result.get('confidence_score', 0.0),
+                        'analysis_summary': analysis_result.get('analysis_summary', 'Sin resumen disponible')
+                    }
+                })
+                
+                logger.info(
+                    f"Análisis forzado completado para conversación {state.id}: "
+                    f"{analysis_result.get('recommended_program', 'UNKNOWN')} "
+                    f"(confianza: {analysis_result.get('confidence_score', 0.0):.2f})"
+                )
+                
+            except Exception as analysis_error:
+                logger.error(f"Error en análisis forzado: {analysis_error}")
+                # Fallback: usar análisis básico del router
+                await self._fallback_forced_analysis(state, analysis_context)
+                
+        except Exception as e:
+            logger.error(f"Error verificando análisis forzado: {e}")
+    
+    async def _fallback_forced_analysis(self, state: ConversationState, analysis_context: Dict[str, Any]) -> None:
+        """
+        Análisis forzado de fallback usando el program router.
+        
+        Args:
+            state: Estado de la conversación
+            analysis_context: Contexto del análisis
+        """
+        try:
+            # Crear mensaje combinado de los últimos intercambios
+            recent_messages = [msg.content for msg in state.messages[-6:] if msg.role == "user"]
+            combined_message = " ".join(recent_messages)
+            
+            # Usar el program router para análisis
+            customer_data_dict = {
+                "id": state.customer_id,
+                "name": state.customer_data.get('name', 'Cliente') if hasattr(state, 'customer_data') else 'Cliente',
+                "age": state.customer_data.get('age') if hasattr(state, 'customer_data') else None,
+                "interests": state.customer_data.get('interests', []) if hasattr(state, 'customer_data') else []
+            }
+            
+            # Obtener historial para contexto
+            conversation_history = [
+                {"role": msg.role, "content": msg.content}
+                for msg in state.messages[-5:]
+            ]
+            
+            program_decision = await self.program_router.determine_program(
+                customer_data=customer_data_dict,
+                initial_message=combined_message,
+                conversation_context={'forced_analysis': True, 'elapsed_seconds': analysis_context['elapsed_seconds']}
+            )
+            
+            # Crear resultado simulado para el agente
+            fallback_result = {
+                'recommended_program': program_decision.recommended_program,
+                'confidence_score': program_decision.confidence_score,
+                'analysis_summary': f"Análisis de fallback - {program_decision.reasoning}"
+            }
+            
+            # Procesar en el agente
+            self._current_agent.process_forced_analysis_result(fallback_result)
+            
+            logger.info(
+                f"Análisis forzado de fallback completado: {program_decision.recommended_program} "
+                f"(confianza: {program_decision.confidence_score:.2f})"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error en análisis forzado de fallback: {e}") 
