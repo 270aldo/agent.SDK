@@ -55,4 +55,5 @@ Thumbs.db
 
 # Archivos temporales
 tmp/
-temp/ 
+temp/ .coverage*
+.venv_clean/
