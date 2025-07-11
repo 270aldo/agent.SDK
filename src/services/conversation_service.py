@@ -34,6 +34,9 @@ from src.services.empathy_engine_service import EmpathyEngineService
 from src.services.adaptive_personality_service import AdaptivePersonalityService
 from src.services.multi_voice_service import MultiVoiceService, SalesSection
 
+# Importar servicio HIE revolucionario
+from src.services.hie_sales_scripts_service import HIESalesScriptsService
+
 # Configurar logging
 logger = logging.getLogger(__name__)
 
@@ -84,6 +87,9 @@ class ConversationService:
         
         # Inicializar servicio de detección de tier
         self.tier_detection_service = TierDetectionService()
+        
+        # Inicializar servicio HIE revolucionario
+        self.hie_sales_scripts_service = HIESalesScriptsService()
         
         # Instancia de agente actual
         self._current_agent: Optional[AgentInterface] = None
@@ -1439,7 +1445,7 @@ class ConversationService:
         emotional_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Construir contexto específico para ventas HIE.
+        Construir contexto específico para ventas HIE usando el servicio revolucionario.
         
         Args:
             message_text: Mensaje actual del usuario
@@ -1447,62 +1453,290 @@ class ConversationService:
             emotional_context: Contexto emocional del usuario
             
         Returns:
-            Dict con contexto HIE para ventas
+            Dict con contexto HIE avanzado para ventas
         """
         try:
-            # Analizar el mensaje para detectar señales de venta
-            sales_signals = self._detect_sales_signals(message_text)
+            # Construir perfil del usuario para el servicio HIE
+            user_profile = self._build_user_profile_for_hie(state, message_text, emotional_context)
             
-            # Determinar arquetipo del cliente (Optimizador vs Arquitecto de Vida)
-            customer_archetype = self._determine_customer_archetype(state, message_text)
+            # Generar secuencia HIE completa usando el servicio revolucionario
+            hie_sequence = self.hie_sales_scripts_service.generate_complete_hie_sequence(user_profile)
             
-            # Detectar objeciones potenciales
+            # Determinar fase de la conversación para seleccionar script apropiado
+            conversation_phase = self._determine_hie_conversation_phase(state, message_text)
+            
+            # Seleccionar script específico para la fase actual
+            current_script = self._select_hie_script_for_phase(hie_sequence, conversation_phase)
+            
+            # Detectar objeciones potenciales para preparar respuestas
             potential_objections = self._detect_potential_objections(message_text)
             
-            # Calcular ROI personalizado si hay suficiente información
-            personalized_roi = await self._calculate_personalized_roi(state, message_text)
-            
-            # Construir contexto HIE
+            # Construir contexto HIE avanzado
             hie_context = {
-                "hie_differentiator": {
-                    "core_message": "NGX cuenta con un Hybrid Intelligence Engine único e imposible de clonar",
-                    "key_points": [
-                        "11 agentes especializados trabajando 24/7",
-                        "Sinergia hombre-máquina imposible de replicar",
-                        "Personalización doble: arquetipo + datos fisiológicos",
-                        "Tecnología propietaria con 18 meses de ventaja"
-                    ],
-                    "proof_points": [
-                        "Usuarios reportan +25% productividad vs soluciones tradicionales",
-                        "Precisión del 94% en recomendaciones personalizadas",
-                        "Solo 1 de cada 10,000 usuarios no ve resultados en 30 días"
-                    ]
+                "hie_revolutionary_system": {
+                    "core_message": "Sistema HIE (High Impact Efficiency) - tecnología imposible de clonar",
+                    "user_metrics": hie_sequence["metricas_hie"],
+                    "archetype": hie_sequence["arquetipo_detectado"],
+                    "biological_urgency": f"Gap biológico: {hie_sequence['metricas_hie']['gap_biologico']} puntos",
+                    "roi_projection": f"ROI biológico estimado: {hie_sequence['metricas_hie']['roi_biologico']} años"
                 },
-                "customer_archetype": customer_archetype,
-                "sales_signals": sales_signals,
+                "current_script": current_script,
+                "conversation_phase": conversation_phase,
+                "hie_sequence": hie_sequence,
                 "potential_objections": potential_objections,
-                "personalized_roi": personalized_roi,
-                "program_benefits": self._get_program_specific_benefits(state.program_type),
-                "urgency_factors": self._generate_urgency_factors(state),
-                "social_proof": self._get_relevant_social_proof(customer_archetype)
+                "neurological_triggers": self._get_neurological_triggers_for_phase(conversation_phase),
+                "sales_barriers": self._identify_sales_barriers(message_text, state),
+                "urgency_factors": self._calculate_urgency_factors(hie_sequence["metricas_hie"], user_profile)
             }
             
+            logger.info(f"HIE context generado para fase: {conversation_phase}, arquetipo: {hie_sequence['arquetipo_detectado']}")
             return hie_context
             
         except Exception as e:
             logger.error(f"Error construyendo contexto HIE: {e}")
-            # Contexto básico de fallback
-            return {
-                "hie_differentiator": {
-                    "core_message": "NGX cuenta con un Hybrid Intelligence Engine único",
-                    "key_points": ["11 agentes especializados", "Personalización avanzada"],
-                    "proof_points": ["Resultados comprobados", "Tecnología única"]
-                },
-                "customer_archetype": "unknown",
-                "sales_signals": [],
-                "potential_objections": [],
-                "personalized_roi": None
+            return self._generate_hie_fallback_context()
+    
+    def _build_user_profile_for_hie(
+        self, 
+        state: ConversationState, 
+        message_text: str, 
+        emotional_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Construir perfil de usuario para el servicio HIE."""
+        try:
+            # Extraer información básica del estado
+            customer_data = state.customer_data
+            
+            # Inferir edad si no está disponible
+            edad = getattr(customer_data, 'age', None)
+            if not edad:
+                # Inferir edad basado en el contexto del mensaje o usar default
+                edad = self._infer_age_from_context(message_text, state)
+            
+            # Construir perfil HIE
+            user_profile = {
+                'edad': edad or 35,
+                'nombre': getattr(customer_data, 'name', 'amigo'),
+                'profession': getattr(customer_data, 'profession', '') or self._infer_profession(message_text, state),
+                'goals': message_text.lower(),
+                'energy_level': self._infer_energy_level(message_text, emotional_context),
+                'sleep_quality': self._infer_sleep_quality(message_text),
+                'stress_level': self._infer_stress_level(message_text, emotional_context),
+                'hourly_rate': self._estimate_hourly_rate(customer_data, message_text)
             }
+            
+            return user_profile
+            
+        except Exception as e:
+            logger.error(f"Error construyendo perfil de usuario HIE: {e}")
+            return {
+                'edad': 35,
+                'nombre': 'amigo',
+                'profession': 'professional',
+                'goals': 'improve performance',
+                'energy_level': 6,
+                'sleep_quality': 6,
+                'stress_level': 6,
+                'hourly_rate': 75
+            }
+    
+    def _determine_hie_conversation_phase(self, state: ConversationState, message_text: str) -> str:
+        """Determinar la fase actual de la conversación HIE."""
+        message_count = len(state.messages)
+        
+        # Analizar keywords en el mensaje para detectar fase
+        message_lower = message_text.lower()
+        
+        if message_count <= 2:
+            return "apertura"
+        elif any(keyword in message_lower for keyword in ['índice', 'eficiencia', 'hie', 'resultados']):
+            return "revelacion_indice"
+        elif any(keyword in message_lower for keyword in ['precio', 'costo', 'caro', 'dinero']):
+            return "superacion_objeciones"
+        elif any(keyword in message_lower for keyword in ['urgente', 'tiempo', 'cuando', 'pronto']):
+            return "urgencia_biologica"
+        elif message_count > 8:
+            return "cierre_hie"
+        else:
+            return "diagnostico_biologico"
+    
+    def _select_hie_script_for_phase(self, hie_sequence: Dict, phase: str) -> str:
+        """Seleccionar script HIE apropiado para la fase actual."""
+        script_map = {
+            "apertura": hie_sequence.get("apertura", ""),
+            "diagnostico_biologico": "Vamos a evaluar tu índice de eficiencia actual...",
+            "revelacion_indice": hie_sequence.get("revelacion_indice", ""),
+            "urgencia_biologica": hie_sequence.get("urgencia_biologica", ""),
+            "superacion_objeciones": "Entiendo tus preocupaciones sobre la inversión...",
+            "cierre_hie": "Basado en tu perfil HIE, es el momento perfecto para comenzar..."
+        }
+        
+        return script_map.get(phase, hie_sequence.get("apertura", ""))
+    
+    def _get_neurological_triggers_for_phase(self, phase: str) -> List[str]:
+        """Obtener gatillos neurológicos específicos para la fase."""
+        trigger_map = {
+            "apertura": ["exclusividad", "perfil único", "candidato ideal"],
+            "diagnostico_biologico": ["análisis personalizado", "datos específicos", "tu situación"],
+            "revelacion_indice": ["tu número", "tu potencial", "gap personal"],
+            "urgencia_biologica": ["ventana limitada", "momento crítico", "cada día cuenta"],
+            "superacion_objeciones": ["inversión en ti", "costo de no actuar", "valor real"],
+            "cierre_hie": ["decisión inteligente", "siguiente paso", "tu transformación"]
+        }
+        
+        return trigger_map.get(phase, ["oportunidad única", "momento perfecto"])
+    
+    def _identify_sales_barriers(self, message_text: str, state: ConversationState) -> List[str]:
+        """Identificar barreras de venta potenciales."""
+        barriers = []
+        message_lower = message_text.lower()
+        
+        if any(word in message_lower for word in ['precio', 'caro', 'dinero', 'presupuesto']):
+            barriers.append("price_concern")
+        
+        if any(word in message_lower for word in ['tiempo', 'ocupado', 'no puedo']):
+            barriers.append("time_concern")
+        
+        if any(word in message_lower for word in ['no funciona', 'no creo', 'escéptico']):
+            barriers.append("skepticism")
+        
+        if any(word in message_lower for word in ['después', 'más tarde', 'pensarlo']):
+            barriers.append("procrastination")
+        
+        return barriers
+    
+    def _calculate_urgency_factors(self, hie_metrics: Dict, user_profile: Dict) -> Dict[str, Any]:
+        """Calcular factores de urgencia personalizados."""
+        edad = user_profile.get('edad', 35)
+        gap_biologico = hie_metrics.get('gap_biologico', 15)
+        
+        return {
+            "age_factor": min(1.0, edad / 60),  # Aumenta con la edad
+            "gap_factor": min(1.0, gap_biologico / 30),  # Aumenta con el gap
+            "opportunity_cost": gap_biologico * user_profile.get('hourly_rate', 50) * 0.1,
+            "biological_decline": f"{0.8 * (edad - 25):.1f} puntos perdidos por edad",
+            "recovery_time": f"{max(1, (edad - 30) * 0.1):.1f}x más tiempo después de los 50"
+        }
+    
+    def _generate_hie_fallback_context(self) -> Dict[str, Any]:
+        """Generar contexto HIE de fallback en caso de error."""
+        return {
+            "hie_revolutionary_system": {
+                "core_message": "Sistema HIE único e imposible de clonar",
+                "user_metrics": {
+                    "indice_actual": 68.5,
+                    "potencial_maximo": 85.2,
+                    "gap_biologico": 16.7,
+                    "urgencia_score": 0.72
+                },
+                "archetype": "optimizador",
+                "biological_urgency": "Gap biológico significativo detectado",
+                "roi_projection": "ROI biológico estimado: 3.8 años"
+            },
+            "current_script": "Hay algo único en tu perfil que me dice que podrías beneficiarte enormemente del sistema HIE.",
+            "conversation_phase": "apertura",
+            "potential_objections": [],
+            "neurological_triggers": ["oportunidad única", "perfil especial"],
+            "sales_barriers": [],
+            "urgency_factors": {
+                "age_factor": 0.6,
+                "gap_factor": 0.55,
+                "opportunity_cost": 125.0
+            }
+        }
+    
+    # Métodos auxiliares para inferir información del usuario
+    def _infer_age_from_context(self, message_text: str, state: ConversationState) -> int:
+        """Inferir edad aproximada del contexto."""
+        message_lower = message_text.lower()
+        
+        if any(word in message_lower for word in ['universidad', 'estudiante', 'carrera']):
+            return 22
+        elif any(word in message_lower for word in ['ejecutivo', 'ceo', 'director']):
+            return 42
+        elif any(word in message_lower for word in ['jubilación', 'retiro', 'nietos']):
+            return 58
+        else:
+            return 35  # Default
+    
+    def _infer_profession(self, message_text: str, state: ConversationState) -> str:
+        """Inferir profesión del contexto."""
+        message_lower = message_text.lower()
+        
+        if any(word in message_lower for word in ['empresa', 'negocio', 'compañía']):
+            return 'entrepreneur'
+        elif any(word in message_lower for word in ['médico', 'doctor', 'salud']):
+            return 'doctor'
+        elif any(word in message_lower for word in ['ejecutivo', 'gerente', 'manager']):
+            return 'manager'
+        else:
+            return 'professional'
+    
+    def _infer_energy_level(self, message_text: str, emotional_context: Optional[Dict]) -> int:
+        """Inferir nivel de energía del 1-10."""
+        if emotional_context:
+            excitement = emotional_context.get('excitement', 0)
+            if excitement > 0.7:
+                return 8
+            elif excitement < 0.3:
+                return 4
+        
+        message_lower = message_text.lower()
+        if any(word in message_lower for word in ['cansado', 'agotado', 'sin energía']):
+            return 3
+        elif any(word in message_lower for word in ['energético', 'activo', 'motivado']):
+            return 8
+        
+        return 6  # Default
+    
+    def _infer_sleep_quality(self, message_text: str) -> int:
+        """Inferir calidad del sueño del 1-10."""
+        message_lower = message_text.lower()
+        
+        if any(word in message_lower for word in ['insomnio', 'mal sueño', 'no duermo']):
+            return 3
+        elif any(word in message_lower for word in ['duermo bien', 'buen sueño', 'descanso']):
+            return 8
+        
+        return 6  # Default
+    
+    def _infer_stress_level(self, message_text: str, emotional_context: Optional[Dict]) -> int:
+        """Inferir nivel de estrés del 1-10."""
+        if emotional_context:
+            anxiety = emotional_context.get('anxiety', 0)
+            if anxiety > 0.7:
+                return 8
+            elif anxiety < 0.3:
+                return 4
+        
+        message_lower = message_text.lower()
+        if any(word in message_lower for word in ['estresado', 'presión', 'abrumado']):
+            return 8
+        elif any(word in message_lower for word in ['relajado', 'tranquilo', 'calmado']):
+            return 3
+        
+        return 6  # Default
+    
+    def _estimate_hourly_rate(self, customer_data, message_text: str) -> int:
+        """Estimar tarifa por hora basada en profesión."""
+        profession = getattr(customer_data, 'profession', '') or self._infer_profession(message_text, None)
+        
+        rate_map = {
+            'ceo': 300,
+            'doctor': 200,
+            'consultant': 150,
+            'manager': 100,
+            'entrepreneur': 125,
+            'engineer': 80,
+            'teacher': 50,
+            'student': 25
+        }
+        
+        for prof, rate in rate_map.items():
+            if prof in profession.lower():
+                return rate
+        
+        return 75  # Default
     
     def _detect_sales_signals(self, message_text: str) -> List[str]:
         """Detectar señales de venta en el mensaje del usuario."""
