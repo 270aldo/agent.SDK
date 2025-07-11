@@ -2,7 +2,11 @@
 Herramientas adaptativas para el agente unificado NGX.
 Permiten análisis dinámico y cambio de enfoque durante la conversación.
 """
-from agents import function_tool
+# from agents import function_tool
+# TODO: Implementar function_tool alternativo o instalar agents sin conflictos
+def function_tool(func):
+    """Decorador temporal para herramientas de función."""
+    return func
 from typing import Dict, Any, List
 import re
 

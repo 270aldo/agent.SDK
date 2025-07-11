@@ -1,7 +1,11 @@
 """
 Herramientas relacionadas con la información y gestión de los programas NGX.
 """
-from agents import function_tool
+# from agents import function_tool
+# TODO: Implementar function_tool alternativo o instalar agents sin conflictos
+def function_tool(func):
+    """Decorador temporal para herramientas de función."""
+    return func
 from src.conversation.flows.basic_flow import ConversationFlow # Para acceder a program_config
 from src.conversation.prompts import PRICE_OBJECTION_TEMPLATE # Importar plantilla
 from typing import Optional

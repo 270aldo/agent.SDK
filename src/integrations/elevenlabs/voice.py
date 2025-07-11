@@ -3,14 +3,20 @@ import logging
 from typing import Optional, Dict, Any, Union, BinaryIO
 from io import BytesIO
 from dotenv import load_dotenv
-# Importaciones correctas para la versión actual
-from elevenlabs import VoiceSettings
-from elevenlabs.client import ElevenLabs
 from enum import Enum
 import asyncio
 
 # Configurar logging
 logger = logging.getLogger(__name__)
+
+# Importaciones correctas para la versión actual
+try:
+    from elevenlabs import VoiceSettings
+    from elevenlabs.client import ElevenLabs
+except ImportError:
+    logger.warning("ElevenLabs not installed. Voice features will be limited.")
+    VoiceSettings = None
+    ElevenLabs = None
 
 # Cargar variables de entorno
 load_dotenv()
@@ -47,20 +53,23 @@ class VoiceEngine:
         self.api_key = os.getenv("ELEVENLABS_API_KEY")
         self.mock_mode = False
         
-        if not self.api_key:
-            logger.warning("Falta variable de entorno ELEVENLABS_API_KEY - usando modo simulado")
+        if not self.api_key or not ElevenLabs:
+            logger.warning("Falta variable de entorno ELEVENLABS_API_KEY o ElevenLabs no disponible - usando modo simulado")
             self.mock_mode = True
         
         # Configuración para voces
-        self.voice_settings = VoiceSettings(
-            stability=0.71,
-            similarity_boost=0.5,
-            style=0.0,
-            use_speaker_boost=True
-        )
+        if VoiceSettings:
+            self.voice_settings = VoiceSettings(
+                stability=0.71,
+                similarity_boost=0.5,
+                style=0.0,
+                use_speaker_boost=True
+            )
+        else:
+            self.voice_settings = None
         
         # Inicializar cliente si no estamos en modo simulado
-        if not self.mock_mode:
+        if not self.mock_mode and ElevenLabs:
             try:
                 self.client = ElevenLabs(api_key=self.api_key)
                 logger.info("Motor de voz ElevenLabs inicializado")

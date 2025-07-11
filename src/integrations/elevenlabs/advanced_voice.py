@@ -17,11 +17,17 @@ from enum import Enum
 import asyncio
 from dotenv import load_dotenv
 
-from elevenlabs import VoiceSettings, Voice
-from elevenlabs.client import ElevenLabs
-
 # Configurar logging
 logger = logging.getLogger(__name__)
+
+try:
+    from elevenlabs import VoiceSettings, Voice
+    from elevenlabs.client import ElevenLabs
+except ImportError:
+    logger.warning("ElevenLabs not installed. Voice features will be limited.")
+    VoiceSettings = None
+    Voice = None
+    ElevenLabs = None
 
 # Cargar variables de entorno
 load_dotenv()
@@ -237,7 +243,7 @@ class AdvancedVoiceEngine:
             BytesIO con audio generado
         """
         try:
-            if self.mock_mode:
+            if self.mock_mode or not ElevenLabs:
                 logger.info(f"MODO SIMULADO - Texto: {text[:50]}...")
                 logger.info(f"Configuración: {persona}, {emotional_state}, {language}")
                 return BytesIO(b"audio_simulado_avanzado")
