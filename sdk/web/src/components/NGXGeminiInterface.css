@@ -1,0 +1,366 @@
+/* NGX Gemini-style Interface - Modern Voice Assistant */
+
+.ngx-gemini-interface {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--ngx-z-modal);
+  font-family: var(--ngx-font-family);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ngx-space-lg);
+}
+
+/* Backdrop */
+.ngx-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(12px);
+  animation: ngxFadeIn 0.3s ease-out;
+}
+
+/* Main Container */
+.ngx-interface-container {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  height: 100%;
+  max-height: 720px;
+  background: var(--ngx-black-onyx);
+  border: 1px solid var(--ngx-glass-border);
+  border-radius: var(--ngx-radius-large);
+  box-shadow: var(--ngx-shadow-large);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: ngxSlideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Header */
+.ngx-header {
+  padding: var(--ngx-space-lg);
+  border-bottom: 1px solid var(--ngx-glass-border);
+  background: var(--ngx-glass-background);
+  backdrop-filter: var(--ngx-glass-backdrop);
+}
+
+.ngx-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ngx-logo-section {
+  display: flex;
+  align-items: center;
+  gap: var(--ngx-space-md);
+}
+
+.ngx-logo {
+  width: 48px;
+  height: 48px;
+  background: var(--ngx-gradient-primary);
+  border-radius: var(--ngx-radius-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--ngx-font-weight-bold);
+  font-size: 18px;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.ngx-title h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: var(--ngx-font-weight-semibold);
+  color: var(--ngx-text-primary);
+  line-height: 1.2;
+}
+
+.ngx-title p {
+  margin: 4px 0 0 0;
+  font-size: 14px;
+  color: var(--ngx-text-secondary);
+  font-weight: var(--ngx-font-weight-regular);
+}
+
+.ngx-session-info {
+  display: flex;
+  align-items: center;
+  gap: var(--ngx-space-md);
+}
+
+.ngx-time-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--ngx-space-sm);
+  background: var(--ngx-glass-background);
+  border: 1px solid var(--ngx-glass-border);
+  border-radius: var(--ngx-radius-medium);
+  padding: var(--ngx-space-sm) var(--ngx-space-md);
+  font-size: 14px;
+  font-weight: var(--ngx-font-weight-medium);
+  color: var(--ngx-text-primary);
+}
+
+.time-icon {
+  font-size: 16px;
+}
+
+.ngx-close-btn {
+  width: 36px;
+  height: 36px;
+  background: var(--ngx-glass-background);
+  border: 1px solid var(--ngx-glass-border);
+  border-radius: var(--ngx-radius-full);
+  color: var(--ngx-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: var(--ngx-transition-normal);
+}
+
+.ngx-close-btn:hover {
+  background: rgba(139, 92, 246, 0.2);
+  color: var(--ngx-text-primary);
+  transform: scale(1.05);
+}
+
+/* Main Content */
+.ngx-main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--ngx-space-xl);
+  gap: var(--ngx-space-xl);
+}
+
+/* Visual Section */
+.ngx-visual-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  position: relative;
+}
+
+/* Status Section */
+.ngx-status-section {
+  text-align: center;
+  padding: var(--ngx-space-lg) 0;
+}
+
+.ngx-status-indicator {
+  animation: ngxStatusFade 0.3s ease-in-out;
+}
+
+.status-message h3 {
+  margin: 0 0 var(--ngx-space-md) 0;
+  font-size: 22px;
+  font-weight: var(--ngx-font-weight-semibold);
+  color: var(--ngx-text-primary);
+  line-height: 1.3;
+}
+
+.status-message p {
+  margin: 0;
+  font-size: 16px;
+  color: var(--ngx-text-secondary);
+  line-height: 1.5;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.status-message.listening h3 {
+  background: var(--ngx-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.status-message.thinking h3 {
+  color: var(--ngx-electric-violet);
+}
+
+.status-message.speaking h3 {
+  background: var(--ngx-gradient-accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.status-message.success h3 {
+  color: #10B981;
+}
+
+/* Controls Section */
+.ngx-controls-section {
+  padding: var(--ngx-space-lg) 0 0 0;
+}
+
+/* Footer */
+.ngx-footer {
+  padding: var(--ngx-space-lg);
+  border-top: 1px solid var(--ngx-glass-border);
+  background: var(--ngx-glass-background);
+  backdrop-filter: var(--ngx-glass-backdrop);
+}
+
+.ngx-footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--ngx-space-md);
+}
+
+.security-badge,
+.context-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--ngx-space-sm);
+  font-size: 12px;
+  color: var(--ngx-text-muted);
+  font-weight: var(--ngx-font-weight-medium);
+}
+
+.context-badge {
+  background: var(--ngx-glass-background);
+  border: 1px solid var(--ngx-glass-border);
+  border-radius: var(--ngx-radius-small);
+  padding: var(--ngx-space-xs) var(--ngx-space-sm);
+  color: var(--ngx-electric-violet);
+}
+
+.security-icon,
+.context-icon {
+  font-size: 14px;
+}
+
+/* Animations */
+@keyframes ngxFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ngxSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ngxStatusFade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .ngx-gemini-interface {
+    padding: var(--ngx-space-md);
+  }
+  
+  .ngx-interface-container {
+    max-width: none;
+    width: 100%;
+    max-height: none;
+    height: 100%;
+    border-radius: var(--ngx-radius-medium);
+  }
+  
+  .ngx-header {
+    padding: var(--ngx-space-md);
+  }
+  
+  .ngx-main-content {
+    padding: var(--ngx-space-lg);
+    gap: var(--ngx-space-lg);
+  }
+  
+  .ngx-visual-section {
+    min-height: 220px;
+  }
+  
+  .status-message h3 {
+    font-size: 20px;
+  }
+  
+  .status-message p {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ngx-gemini-interface {
+    padding: 0;
+  }
+  
+  .ngx-interface-container {
+    border-radius: 0;
+    height: 100vh;
+    max-height: none;
+  }
+  
+  .ngx-header-content {
+    flex-wrap: wrap;
+    gap: var(--ngx-space-sm);
+  }
+  
+  .ngx-logo-section {
+    gap: var(--ngx-space-sm);
+  }
+  
+  .ngx-logo {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+  
+  .ngx-title h2 {
+    font-size: 18px;
+  }
+  
+  .ngx-title p {
+    font-size: 13px;
+  }
+  
+  .ngx-footer-content {
+    flex-direction: column;
+    gap: var(--ngx-space-sm);
+    text-align: center;
+  }
+}
+
+/* Dark mode enhancements */
+@media (prefers-color-scheme: dark) {
+  .ngx-interface-container {
+    box-shadow: 
+      var(--ngx-shadow-large),
+      0 0 0 1px rgba(139, 92, 246, 0.1);
+  }
+}

@@ -1,0 +1,289 @@
+/* NGX Audio 3D Visual Component */
+
+.ngx-audio-3d-visual {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--ngx-radius-large);
+}
+
+.three-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.three-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Fallback indicators for devices that can't handle 3D */
+.fallback-indicators {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: none;
+  pointer-events: none;
+}
+
+/* Show fallback on low-performance devices */
+@media (max-width: 480px), 
+       (prefers-reduced-motion: reduce),
+       (-webkit-transform-3d: 0) {
+  .three-container {
+    display: none;
+  }
+  
+  .fallback-indicators {
+    display: block;
+  }
+}
+
+/* Pulse indicator for listening state */
+.pulse-indicator {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pulse-ring {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  border: 3px solid var(--ngx-electric-violet);
+  border-radius: 50%;
+  opacity: 0;
+  animation: ngxPulse 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+.pulse-ring:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.pulse-ring:nth-child(3) {
+  animation-delay: 1s;
+}
+
+/* Wave indicator for speaking state */
+.wave-indicator {
+  display: flex;
+  align-items: end;
+  gap: 6px;
+  height: 100px;
+  justify-content: center;
+}
+
+.wave {
+  width: 6px;
+  background: var(--ngx-gradient-primary);
+  border-radius: 3px;
+  min-height: 20px;
+  animation: ngxWaveAnimation 0.8s ease-in-out infinite alternate;
+  transition: height 0.1s ease;
+}
+
+.wave:nth-child(1) { animation-delay: 0s; }
+.wave:nth-child(2) { animation-delay: 0.1s; }
+.wave:nth-child(3) { animation-delay: 0.2s; }
+.wave:nth-child(4) { animation-delay: 0.3s; }
+
+/* Thinking indicator */
+.thinking-indicator {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.thinking-dot {
+  width: 16px;
+  height: 16px;
+  background: var(--ngx-electric-violet);
+  border-radius: 50%;
+  animation: ngxThinkingDot 1.4s ease-in-out infinite;
+}
+
+.thinking-dot:nth-child(1) { animation-delay: 0s; }
+.thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* State-specific styling */
+.ngx-audio-3d-visual.idle {
+  background: radial-gradient(circle at center, rgba(139, 92, 246, 0.05), transparent 70%);
+}
+
+.ngx-audio-3d-visual.listening {
+  background: radial-gradient(circle at center, rgba(139, 92, 246, 0.15), transparent 70%);
+  box-shadow: inset 0 0 50px rgba(139, 92, 246, 0.2);
+}
+
+.ngx-audio-3d-visual.speaking {
+  background: radial-gradient(circle at center, rgba(139, 92, 246, 0.2), rgba(91, 33, 182, 0.1) 70%);
+  box-shadow: inset 0 0 60px rgba(139, 92, 246, 0.3);
+}
+
+.ngx-audio-3d-visual.thinking {
+  background: radial-gradient(circle at center, rgba(91, 33, 182, 0.1), transparent 70%);
+  box-shadow: inset 0 0 40px rgba(91, 33, 182, 0.2);
+}
+
+.ngx-audio-3d-visual.success {
+  background: radial-gradient(circle at center, rgba(16, 185, 129, 0.15), transparent 70%);
+  box-shadow: inset 0 0 50px rgba(16, 185, 129, 0.2);
+}
+
+/* Animations */
+@keyframes ngxPulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes ngxWaveAnimation {
+  0% {
+    height: 20px;
+    opacity: 0.5;
+  }
+  100% {
+    height: 80px;
+    opacity: 1;
+  }
+}
+
+@keyframes ngxThinkingDot {
+  0%, 60%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  30% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+}
+
+/* Performance optimizations */
+.ngx-audio-3d-visual * {
+  will-change: transform, opacity;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .pulse-ring,
+  .wave,
+  .thinking-dot {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  
+  .ngx-audio-3d-visual {
+    background: var(--ngx-glass-background) !important;
+    box-shadow: none !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .pulse-ring {
+    border-color: #FFFFFF;
+    border-width: 4px;
+  }
+  
+  .wave {
+    background: #FFFFFF;
+  }
+  
+  .thinking-dot {
+    background: #FFFFFF;
+  }
+}
+
+/* Dark mode enhancements */
+@media (prefers-color-scheme: dark) {
+  .ngx-audio-3d-visual.listening {
+    box-shadow: 
+      inset 0 0 50px rgba(139, 92, 246, 0.3),
+      0 0 30px rgba(139, 92, 246, 0.1);
+  }
+  
+  .ngx-audio-3d-visual.speaking {
+    box-shadow: 
+      inset 0 0 60px rgba(139, 92, 246, 0.4),
+      0 0 40px rgba(139, 92, 246, 0.15);
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .ngx-audio-3d-visual {
+    min-height: 220px;
+  }
+  
+  .pulse-indicator {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .pulse-ring {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .wave-indicator {
+    height: 80px;
+  }
+  
+  .wave {
+    width: 5px;
+  }
+  
+  .thinking-dot {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ngx-audio-3d-visual {
+    min-height: 180px;
+  }
+  
+  .pulse-indicator {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .pulse-ring {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .wave-indicator {
+    height: 60px;
+    gap: 4px;
+  }
+  
+  .wave {
+    width: 4px;
+  }
+  
+  .thinking-dot {
+    width: 12px;
+    height: 12px;
+  }
+}

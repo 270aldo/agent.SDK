@@ -26,4 +26,22 @@ sqlalchemy==2.0.25
 # Utilities
 python-dotenv==1.0.1
 pyjwt==2.8.0
-tenacity==9.0.0 
+tenacity==9.0.0
+
+# Machine Learning & Data Science
+scikit-learn==1.5.2
+pandas==2.2.3
+numpy==1.26.4
+scipy==1.14.1
+
+# ML Optimization & Experimentation
+optuna==4.1.0
+bayesian-optimization==2.0.0
+statsmodels==0.14.4
+
+# ML Model Management & Tracking
+mlflow==2.19.0
+
+# Additional ML utilities
+joblib==1.4.2
+psutil==6.1.0 

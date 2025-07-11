@@ -1,0 +1,491 @@
+/* NGX Controls Component */
+
+.ngx-controls {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ngx-space-lg);
+  font-family: var(--ngx-font-family);
+}
+
+/* Main Control Group */
+.main-control-group {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.main-action-btn {
+  position: relative;
+  width: 160px;
+  height: 60px;
+  background: var(--ngx-gradient-primary);
+  border: none;
+  border-radius: var(--ngx-radius-large);
+  color: white;
+  font-family: var(--ngx-font-family);
+  font-weight: var(--ngx-font-weight-semibold);
+  font-size: 16px;
+  cursor: pointer;
+  transition: var(--ngx-transition-normal);
+  box-shadow: var(--ngx-shadow-medium);
+  overflow: hidden;
+}
+
+.main-action-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--ngx-shadow-large);
+}
+
+.main-action-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.main-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ngx-space-sm);
+  position: relative;
+  z-index: 2;
+}
+
+.btn-icon {
+  font-size: 20px;
+}
+
+.btn-text {
+  font-size: 16px;
+  font-weight: var(--ngx-font-weight-semibold);
+}
+
+/* State-specific button styling */
+.main-action-btn.listening {
+  background: var(--ngx-gradient-accent);
+  animation: ngxListeningPulse 2s ease-in-out infinite;
+}
+
+.main-action-btn.speaking {
+  background: linear-gradient(135deg, #10B981, #059669);
+}
+
+.main-action-btn.thinking {
+  background: linear-gradient(135deg, #6B7280, #4B5563);
+}
+
+.main-action-btn.success {
+  background: linear-gradient(135deg, #10B981, #047857);
+}
+
+/* Recording indicator */
+.recording-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: var(--ngx-radius-large);
+  pointer-events: none;
+}
+
+.recording-pulse {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border: 3px solid var(--ngx-electric-violet);
+  border-radius: var(--ngx-radius-large);
+  animation: ngxRecordingPulse 1.5s ease-in-out infinite;
+}
+
+/* Secondary Controls */
+.secondary-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ngx-space-md);
+  align-items: center;
+}
+
+/* Mode Selector */
+.mode-selector-group {
+  position: relative;
+}
+
+.mode-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--ngx-space-sm);
+  padding: var(--ngx-space-sm) var(--ngx-space-md);
+  background: var(--ngx-glass-background);
+  border: 1px solid var(--ngx-glass-border);
+  border-radius: var(--ngx-radius-medium);
+  color: var(--ngx-text-primary);
+  font-family: var(--ngx-font-family);
+  font-size: 14px;
+  font-weight: var(--ngx-font-weight-medium);
+  cursor: pointer;
+  transition: var(--ngx-transition-normal);
+}
+
+.mode-toggle-btn:hover {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.mode-toggle-btn.active {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: var(--ngx-electric-violet);
+}
+
+.mode-icon {
+  font-size: 16px;
+}
+
+.mode-text {
+  font-size: 14px;
+}
+
+.chevron {
+  font-size: 12px;
+  transition: var(--ngx-transition-fast);
+}
+
+.mode-toggle-btn.active .chevron {
+  transform: rotate(180deg);
+}
+
+/* Mode Selector Dropdown */
+.mode-selector-dropdown {
+  position: absolute;
+  top: calc(100% + var(--ngx-space-sm));
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 240px;
+  background: var(--ngx-black-onyx);
+  border: 1px solid var(--ngx-glass-border);
+  border-radius: var(--ngx-radius-medium);
+  box-shadow: var(--ngx-shadow-large);
+  z-index: 1000;
+  animation: ngxDropdownSlide 0.2s ease-out;
+  backdrop-filter: var(--ngx-glass-backdrop);
+}
+
+.mode-option {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ngx-space-md);
+  padding: var(--ngx-space-md);
+  background: transparent;
+  border: none;
+  color: var(--ngx-text-primary);
+  font-family: var(--ngx-font-family);
+  text-align: left;
+  cursor: pointer;
+  transition: var(--ngx-transition-fast);
+}
+
+.mode-option:hover {
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.mode-option.active {
+  background: rgba(139, 92, 246, 0.2);
+  border-left: 3px solid var(--ngx-electric-violet);
+}
+
+.option-icon {
+  font-size: 18px;
+  margin-top: 2px;
+}
+
+.option-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.option-text {
+  font-size: 14px;
+  font-weight: var(--ngx-font-weight-medium);
+  color: var(--ngx-text-primary);
+}
+
+.option-desc {
+  font-size: 12px;
+  color: var(--ngx-text-muted);
+  line-height: 1.4;
+}
+
+/* Action Buttons */
+.action-buttons {
+  display: flex;
+  gap: var(--ngx-space-md);
+  align-items: center;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--ngx-space-sm);
+  padding: var(--ngx-space-sm) var(--ngx-space-md);
+  background: var(--ngx-glass-background);
+  border: 1px solid var(--ngx-glass-border);
+  border-radius: var(--ngx-radius-medium);
+  color: var(--ngx-text-secondary);
+  font-family: var(--ngx-font-family);
+  font-size: 13px;
+  font-weight: var(--ngx-font-weight-medium);
+  cursor: pointer;
+  transition: var(--ngx-transition-normal);
+}
+
+.action-btn:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--ngx-text-primary);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-btn.secondary {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #EF4444;
+}
+
+.action-btn.secondary:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.action-btn.utility {
+  border-color: rgba(156, 163, 175, 0.3);
+  color: #9CA3AF;
+}
+
+.action-btn.utility:hover:not(:disabled) {
+  background: rgba(156, 163, 175, 0.1);
+  border-color: rgba(156, 163, 175, 0.5);
+  color: var(--ngx-text-secondary);
+}
+
+/* Status Bar */
+.status-bar {
+  padding: var(--ngx-space-md) 0;
+  border-top: 1px solid var(--ngx-glass-border);
+}
+
+.status-indicators {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--ngx-space-md);
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: var(--ngx-space-sm);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6B7280;
+  transition: var(--ngx-transition-normal);
+}
+
+.connection-status.connected .status-dot {
+  background: #10B981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.status-text {
+  font-size: 12px;
+  color: var(--ngx-text-muted);
+  font-weight: var(--ngx-font-weight-medium);
+}
+
+.mode-indicator {
+  display: flex;
+  align-items: center;
+}
+
+.mode-badge {
+  background: var(--ngx-glass-background);
+  border: 1px solid var(--ngx-glass-border);
+  border-radius: var(--ngx-radius-small);
+  padding: 4px var(--ngx-space-sm);
+  font-size: 11px;
+  font-weight: var(--ngx-font-weight-medium);
+  color: var(--ngx-electric-violet);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Quick Actions */
+.quick-actions {
+  text-align: center;
+  padding-top: var(--ngx-space-md);
+}
+
+.gesture-hint {
+  opacity: 0.7;
+}
+
+.hint-text {
+  font-size: 12px;
+  color: var(--ngx-text-muted);
+  font-style: italic;
+}
+
+/* Animations */
+@keyframes ngxListeningPulse {
+  0%, 100% {
+    box-shadow: var(--ngx-shadow-medium);
+  }
+  50% {
+    box-shadow: var(--ngx-shadow-large), 0 0 30px rgba(139, 92, 246, 0.4);
+  }
+}
+
+@keyframes ngxRecordingPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes ngxDropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .main-action-btn {
+    width: 140px;
+    height: 55px;
+    font-size: 15px;
+  }
+  
+  .btn-icon {
+    font-size: 18px;
+  }
+  
+  .btn-text {
+    font-size: 15px;
+  }
+  
+  .secondary-controls {
+    gap: var(--ngx-space-md);
+  }
+  
+  .action-buttons {
+    gap: var(--ngx-space-sm);
+  }
+  
+  .mode-selector-dropdown {
+    min-width: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-action-btn {
+    width: 120px;
+    height: 50px;
+    font-size: 14px;
+  }
+  
+  .btn-icon {
+    font-size: 16px;
+  }
+  
+  .btn-text {
+    font-size: 14px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .action-btn {
+    justify-content: center;
+    width: 100%;
+  }
+  
+  .status-indicators {
+    flex-direction: column;
+    gap: var(--ngx-space-sm);
+    text-align: center;
+  }
+  
+  .mode-selector-dropdown {
+    min-width: 180px;
+    left: 0;
+    transform: none;
+  }
+  
+  .quick-actions {
+    display: none; /* Hide on mobile to save space */
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .main-action-btn,
+  .action-btn,
+  .mode-toggle-btn {
+    transition: none;
+  }
+  
+  .ngxListeningPulse,
+  .ngxRecordingPulse,
+  .ngxDropdownSlide {
+    animation: none;
+  }
+  
+  .recording-pulse {
+    opacity: 0.8;
+    animation: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .main-action-btn {
+    border: 2px solid #FFFFFF;
+  }
+  
+  .action-btn,
+  .mode-toggle-btn {
+    border: 2px solid currentColor;
+  }
+  
+  .status-dot {
+    border: 1px solid currentColor;
+  }
+}

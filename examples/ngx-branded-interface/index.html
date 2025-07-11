@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NGX Gemini-Style Voice Interface - Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
+    
+    <style>
+        /* NGX Design System Tokens */
+        :root {
+            --ngx-black-onyx: #000000;
+            --ngx-electric-violet: #8B5CF6;
+            --ngx-deep-purple: #5B21B6;
+            --ngx-gradient-primary: linear-gradient(135deg, #8B5CF6 0%, #5B21B6 100%);
+            --ngx-font-family: 'Josefin Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: var(--ngx-font-family);
+            background: linear-gradient(135deg, #000000 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        .demo-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            position: relative;
+        }
+        
+        .demo-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            z-index: 1;
+        }
+        
+        .demo-title {
+            font-size: 3rem;
+            font-weight: 700;
+            background: var(--ngx-gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+        
+        .demo-subtitle {
+            font-size: 1.25rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 400;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .demo-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .demo-btn {
+            padding: 0.75rem 1.5rem;
+            background: var(--ngx-gradient-primary);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-family: var(--ngx-font-family);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+        
+        .demo-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
+        }
+        
+        .demo-btn.secondary {
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            max-width: 1000px;
+            margin-top: 2rem;
+            z-index: 1;
+        }
+        
+        .feature-card {
+            background: rgba(139, 92, 246, 0.05);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: blur(20px);
+        }
+        
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .feature-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--ngx-electric-violet);
+        }
+        
+        .feature-desc {
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+            font-size: 0.9rem;
+        }
+        
+        .background-pattern {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.1;
+            background: 
+                radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(91, 33, 182, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 60%, rgba(139, 92, 246, 0.2) 0%, transparent 50%);
+        }
+        
+        @media (max-width: 768px) {
+            .demo-title {
+                font-size: 2rem;
+            }
+            
+            .demo-subtitle {
+                font-size: 1rem;
+            }
+            
+            .demo-container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-pattern"></div>
+    
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1 class="demo-title">NGX Voice Assistant</h1>
+            <p class="demo-subtitle">
+                Experimenta la nueva interfaz de voz inspirada en Google Gemini, 
+                pero con el poder y diseño único de NGX
+            </p>
+        </div>
+        
+        <div class="demo-controls">
+            <button id="openInterface" class="demo-btn">
+                🎤 Abrir Interfaz de Voz
+            </button>
+            <button id="openModern" class="demo-btn secondary">
+                ⚡ Interfaz Moderna
+            </button>
+            <button id="testAudio" class="demo-btn secondary">
+                🔊 Test Audio
+            </button>
+        </div>
+        
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🧠</div>
+                <h3 class="feature-title">IA Emocional Avanzada</h3>
+                <p class="feature-desc">
+                    Detecta y adapta automáticamente el estado emocional del usuario 
+                    para conversaciones más naturales y empáticas.
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎨</div>
+                <h3 class="feature-title">Visualización 3D</h3>
+                <p class="feature-desc">
+                    Sphere de energía animado en tiempo real que responde 
+                    al audio y estado de la conversación con efectos únicos.
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3 class="feature-title">Respuesta Ultra-Rápida</h3>
+                <p class="feature-desc">
+                    Latencia mínima (~75ms) para interacciones fluidas 
+                    y naturales que se sienten completamente humanas.
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3 class="feature-title">Contextual Inteligente</h3>
+                <p class="feature-desc">
+                    Se adapta automáticamente según el punto de contacto: 
+                    landing page, lead magnet, blog o exit intent.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+        
+        // Simulated NGX Gemini Interface Component
+        const NGXGeminiInterfaceDemo = ({ isOpen, onClose }) => {
+            const [conversationState, setConversationState] = useState('idle');
+            const [isRecording, setIsRecording] = useState(false);
+            const [audioLevel, setAudioLevel] = useState(0);
+            const [timeRemaining, setTimeRemaining] = useState(420);
+            
+            useEffect(() => {
+                if (!isOpen) return;
+                
+                const timer = setInterval(() => {
+                    setTimeRemaining(prev => prev > 0 ? prev - 1 : 0);
+                }, 1000);
+                
+                return () => clearInterval(timer);
+            }, [isOpen]);
+            
+            useEffect(() => {
+                if (isRecording) {
+                    const interval = setInterval(() => {
+                        setAudioLevel(Math.random() * 0.8 + 0.2);
+                    }, 100);
+                    return () => clearInterval(interval);
+                }
+            }, [isRecording]);
+            
+            const formatTime = (seconds) => {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            };
+            
+            const handleStartRecording = () => {
+                setIsRecording(true);
+                setConversationState('listening');
+            };
+            
+            const handleStopRecording = () => {
+                setIsRecording(false);
+                setConversationState('thinking');
+                
+                setTimeout(() => {
+                    setConversationState('speaking');
+                    setTimeout(() => {
+                        setConversationState('idle');
+                    }, 2000);
+                }, 1500);
+            };
+            
+            if (!isOpen) return null;
+            
+            return (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.8)',
+                    backdropFilter: 'blur(12px)',
+                    zIndex: 1000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '2rem',
+                    animation: 'fadeIn 0.3s ease-out'
+                }}>
+                    <div style={{
+                        width: '100%',
+                        maxWidth: '480px',
+                        height: '100%',
+                        maxHeight: '720px',
+                        background: '#000000',
+                        border: '1px solid rgba(139, 92, 246, 0.2)',
+                        borderRadius: '24px',
+                        boxShadow: '0 16px 48px rgba(139, 92, 246, 0.25), 0 0 24px rgba(139, 92, 246, 0.2)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                        animation: 'slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                    }}>
+                        {/* Header */}
+                        <div style={{
+                            padding: '1.5rem',
+                            borderBottom: '1px solid rgba(139, 92, 246, 0.2)',
+                            background: 'rgba(139, 92, 246, 0.08)',
+                            backdropFilter: 'blur(20px)'
+                        }}>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <div style={{
+                                        width: '48px',
+                                        height: '48px',
+                                        background: 'linear-gradient(135deg, #8B5CF6, #5B21B6)',
+                                        borderRadius: '16px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontWeight: '700',
+                                        fontSize: '18px',
+                                        color: 'white'
+                                    }}>NGX</div>
+                                    <div>
+                                        <h2 style={{
+                                            margin: 0,
+                                            fontSize: '20px',
+                                            fontWeight: '600',
+                                            color: 'white'
+                                        }}>Expert Assistant</h2>
+                                        <p style={{
+                                            margin: 0,
+                                            fontSize: '14px',
+                                            color: 'rgba(255, 255, 255, 0.8)'
+                                        }}>Conversación Inteligente</p>
+                                    </div>
+                                </div>
+                                
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        background: 'rgba(139, 92, 246, 0.08)',
+                                        border: '1px solid rgba(139, 92, 246, 0.2)',
+                                        borderRadius: '16px',
+                                        padding: '0.5rem 1rem',
+                                        fontSize: '14px',
+                                        color: 'white'
+                                    }}>
+                                        <span>⏱️</span>
+                                        <span>{formatTime(timeRemaining)}</span>
+                                    </div>
+                                    <button
+                                        onClick={onClose}
+                                        style={{
+                                            width: '36px',
+                                            height: '36px',
+                                            background: 'rgba(139, 92, 246, 0.08)',
+                                            border: '1px solid rgba(139, 92, 246, 0.2)',
+                                            borderRadius: '50%',
+                                            color: 'rgba(255, 255, 255, 0.8)',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}
+                                    >✕</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Main Content */}
+                        <div style={{
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            padding: '2rem',
+                            gap: '2rem'
+                        }}>
+                            {/* 3D Visual Placeholder */}
+                            <div style={{
+                                flex: 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                minHeight: '280px',
+                                background: 'radial-gradient(circle at center, rgba(139, 92, 246, 0.15), transparent 70%)',
+                                borderRadius: '24px',
+                                position: 'relative'
+                            }}>
+                                <div style={{
+                                    width: '120px',
+                                    height: '120px',
+                                    background: 'linear-gradient(135deg, #8B5CF6, #5B21B6)',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '48px',
+                                    animation: conversationState === 'listening' ? 'pulse 2s ease-in-out infinite' :
+                                              conversationState === 'speaking' ? 'speak 1s ease-in-out infinite' :
+                                              conversationState === 'thinking' ? 'think 1.5s ease-in-out infinite' : 'none',
+                                    boxShadow: '0 0 30px rgba(139, 92, 246, 0.5)'
+                                }}>
+                                    {conversationState === 'listening' && '👂'}
+                                    {conversationState === 'speaking' && '🗣️'}
+                                    {conversationState === 'thinking' && '🧠'}
+                                    {conversationState === 'idle' && '🎤'}
+                                </div>
+                            </div>
+                            
+                            {/* Status */}
+                            <div style={{ textAlign: 'center' }}>
+                                <h3 style={{
+                                    margin: '0 0 0.5rem 0',
+                                    fontSize: '22px',
+                                    fontWeight: '600',
+                                    color: 'white'
+                                }}>
+                                    {conversationState === 'idle' && 'Listo para conversar'}
+                                    {conversationState === 'listening' && 'Te escucho atentamente...'}
+                                    {conversationState === 'thinking' && 'Analizando tu situación...'}
+                                    {conversationState === 'speaking' && 'Compartiendo insights...'}
+                                </h3>
+                                <p style={{
+                                    margin: 0,
+                                    fontSize: '16px',
+                                    color: 'rgba(255, 255, 255, 0.8)',
+                                    maxWidth: '320px',
+                                    margin: '0 auto'
+                                }}>
+                                    {conversationState === 'idle' && '¡Hola! Soy tu asistente experto NGX. ¿Tienes 7 minutos para una conversación personalizada?'}
+                                    {conversationState === 'listening' && 'Habla con naturalidad sobre tu situación'}
+                                    {conversationState === 'thinking' && 'Procesando tu información para darte la mejor respuesta'}
+                                    {conversationState === 'speaking' && 'Escucha mis recomendaciones personalizadas para ti'}
+                                </p>
+                            </div>
+                            
+                            {/* Controls */}
+                            <div style={{ textAlign: 'center' }}>
+                                <button
+                                    onClick={isRecording ? handleStopRecording : handleStartRecording}
+                                    disabled={conversationState === 'thinking' || conversationState === 'speaking'}
+                                    style={{
+                                        width: '160px',
+                                        height: '60px',
+                                        background: isRecording ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #8B5CF6, #5B21B6)',
+                                        border: 'none',
+                                        borderRadius: '24px',
+                                        color: 'white',
+                                        fontFamily: 'var(--ngx-font-family)',
+                                        fontWeight: '600',
+                                        fontSize: '16px',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 8px 24px rgba(139, 92, 246, 0.2)',
+                                        opacity: (conversationState === 'thinking' || conversationState === 'speaking') ? 0.6 : 1
+                                    }}
+                                >
+                                    {isRecording ? '🛑 Pausar' : '🎤 Hablar'}
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {/* Footer */}
+                        <div style={{
+                            padding: '1.5rem',
+                            borderTop: '1px solid rgba(139, 92, 246, 0.2)',
+                            background: 'rgba(139, 92, 246, 0.08)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                fontSize: '12px',
+                                color: 'rgba(255, 255, 255, 0.6)'
+                            }}>
+                                <span>🔒</span>
+                                <span>Conversación segura y confidencial</span>
+                            </div>
+                            <div style={{
+                                background: 'rgba(139, 92, 246, 0.08)',
+                                border: '1px solid rgba(139, 92, 246, 0.2)',
+                                borderRadius: '8px',
+                                padding: '4px 8px',
+                                fontSize: '11px',
+                                color: '#8B5CF6'
+                            }}>
+                                📍 DEMO
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // Main Demo App
+        const DemoApp = () => {
+            const [isGeminiOpen, setIsGeminiOpen] = useState(false);
+            const [isModernOpen, setIsModernOpen] = useState(false);
+            
+            return (
+                <div>
+                    <NGXGeminiInterfaceDemo 
+                        isOpen={isGeminiOpen} 
+                        onClose={() => setIsGeminiOpen(false)} 
+                    />
+                    
+                    {/* Add modern interface here when needed */}
+                </div>
+            );
+        };
+        
+        // Render the app
+        ReactDOM.render(<DemoApp />, document.getElementById('react-demo'));
+        
+        // Event listeners for demo buttons
+        document.getElementById('openInterface').addEventListener('click', () => {
+            setIsGeminiOpen(true);
+        });
+        
+        document.getElementById('openModern').addEventListener('click', () => {
+            alert('Interfaz moderna próximamente disponible!');
+        });
+        
+        document.getElementById('testAudio').addEventListener('click', () => {
+            alert('Test de audio - verificando permisos de micrófono...');
+        });
+    </script>
+    
+    <div id="react-demo"></div>
+    
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 30px rgba(139, 92, 246, 0.5); }
+            50% { transform: scale(1.1); box-shadow: 0 0 50px rgba(139, 92, 246, 0.8); }
+        }
+        
+        @keyframes speak {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        @keyframes think {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-5deg); }
+            75% { transform: rotate(5deg); }
+        }
+    </style>
+</body>
+</html>

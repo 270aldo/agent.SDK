@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { EnergyBall } from './EnergyBall';
+import '../styles/NGXDesignTokens.css';
 import './ModernVoiceInterface.css';
 
 interface VoiceInterfaceProps {

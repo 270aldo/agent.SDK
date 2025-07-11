@@ -1,0 +1,92 @@
+/* NGX Design System Tokens */
+/* Based on official NGX Design System */
+
+:root {
+  /* Primary Colors */
+  --ngx-black-onyx: #000000;
+  --ngx-electric-violet: #8B5CF6;
+  --ngx-deep-purple: #5B21B6;
+  
+  /* Gradients */
+  --ngx-gradient-primary: linear-gradient(135deg, #8B5CF6 0%, #5B21B6 100%);
+  --ngx-gradient-secondary: linear-gradient(135deg, #000000 0%, #5B21B6 100%);
+  --ngx-gradient-accent: linear-gradient(135deg, #8B5CF6 0%, #000000 100%);
+  
+  /* Typography */
+  --ngx-font-family: 'Josefin Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --ngx-font-weight-light: 300;
+  --ngx-font-weight-regular: 400;
+  --ngx-font-weight-medium: 500;
+  --ngx-font-weight-semibold: 600;
+  --ngx-font-weight-bold: 700;
+  
+  /* Semantic Colors */
+  --ngx-primary: var(--ngx-electric-violet);
+  --ngx-secondary: var(--ngx-deep-purple);
+  --ngx-background: var(--ngx-black-onyx);
+  --ngx-surface: rgba(139, 92, 246, 0.1);
+  --ngx-surface-elevated: rgba(139, 92, 246, 0.15);
+  
+  /* Text Colors */
+  --ngx-text-primary: #FFFFFF;
+  --ngx-text-secondary: rgba(255, 255, 255, 0.8);
+  --ngx-text-muted: rgba(255, 255, 255, 0.6);
+  --ngx-text-accent: var(--ngx-electric-violet);
+  
+  /* Glass Morphism */
+  --ngx-glass-background: rgba(139, 92, 246, 0.08);
+  --ngx-glass-border: rgba(139, 92, 246, 0.2);
+  --ngx-glass-backdrop: blur(20px);
+  
+  /* Shadows */
+  --ngx-shadow-small: 0 4px 12px rgba(139, 92, 246, 0.15);
+  --ngx-shadow-medium: 0 8px 24px rgba(139, 92, 246, 0.2);
+  --ngx-shadow-large: 0 16px 48px rgba(139, 92, 246, 0.25);
+  --ngx-shadow-glow: 0 0 24px rgba(139, 92, 246, 0.4);
+  
+  /* Border Radius */
+  --ngx-radius-small: 8px;
+  --ngx-radius-medium: 16px;
+  --ngx-radius-large: 24px;
+  --ngx-radius-full: 50%;
+  
+  /* Spacing */
+  --ngx-space-xs: 4px;
+  --ngx-space-sm: 8px;
+  --ngx-space-md: 16px;
+  --ngx-space-lg: 24px;
+  --ngx-space-xl: 32px;
+  --ngx-space-2xl: 48px;
+  
+  /* Animation */
+  --ngx-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --ngx-transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --ngx-transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Z-Index */
+  --ngx-z-backdrop: 1000;
+  --ngx-z-modal: 1010;
+  --ngx-z-tooltip: 1020;
+  --ngx-z-notification: 1030;
+}
+
+/* Font Loading */
+@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap');
+
+/* Base Utilities */
+.ngx-gradient-text {
+  background: var(--ngx-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ngx-glass {
+  background: var(--ngx-glass-background);
+  backdrop-filter: var(--ngx-glass-backdrop);
+  border: 1px solid var(--ngx-glass-border);
+}
+
+.ngx-glow {
+  box-shadow: var(--ngx-shadow-glow);
+}
