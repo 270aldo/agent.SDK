@@ -15,6 +15,7 @@ from src.utils.observability import init_observability
 
 from src.api.middleware.rate_limiter import RateLimiter, get_user_from_request
 from src.api.middleware.error_handlers import http_exception_handler, validation_exception_handler, internal_exception_handler
+from src.api.middleware.security_headers import SecurityHeadersMiddleware
 from src.auth.jwt_functions import decode_token
 from .routers import conversation
 from .routers import qualification
@@ -63,6 +64,9 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept"],
     expose_headers=["X-Request-ID", "X-Rate-Limit-Limit", "X-Rate-Limit-Remaining", "X-Rate-Limit-Reset"]
 )
+
+# Configurar headers de seguridad
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Configurar limitador de tasa
 app.add_middleware(
