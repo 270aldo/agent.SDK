@@ -18,14 +18,14 @@ sys.path.insert(0, project_root)
 
 try:
     from src.services.emotional_intelligence_service import (
-        EmotionalIntelligenceService, EmotionalState, EmotionalIntensity, EmotionalProfile
+        EmotionalIntelligenceService, EmotionalState, EmotionalProfile
     )
     from src.services.empathy_engine_service import (
-        EmpathyEngineService, EmpathyTechnique, EmpathyLevel, EmpathicResponse
+        EmpathyEngineService, EmpathyTechnique, EmpathyResponse
     )
     from src.services.adaptive_personality_service import (
         AdaptivePersonalityService, PersonalityProfile, CommunicationStyle, 
-        PersonalityDimension, CulturalContext
+        PersonalityTrait, AdaptedCommunication
     )
 except ImportError as e:
     print(f"Error importing services: {e}")

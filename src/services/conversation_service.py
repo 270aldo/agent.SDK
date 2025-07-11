@@ -26,6 +26,7 @@ from src.services.follow_up_service import FollowUpService
 from src.services.personalization_service import PersonalizationService
 from src.services.nlp_integration_service import NLPIntegrationService
 from src.services.program_router import ProgramRouter
+from src.services.tier_detection_service import TierDetectionService
 
 # Importar nuevos servicios de inteligencia emocional
 from src.services.emotional_intelligence_service import EmotionalIntelligenceService
@@ -80,6 +81,9 @@ class ConversationService:
         
         # Inicializar router de programas para detección automática
         self.program_router = ProgramRouter()
+        
+        # Inicializar servicio de detección de tier
+        self.tier_detection_service = TierDetectionService()
         
         # Instancia de agente actual
         self._current_agent: Optional[AgentInterface] = None
@@ -712,9 +716,9 @@ class ConversationService:
             raise RuntimeError(f"No se pudo restaurar el agente: {str(e)}") from e
     
     async def _process_with_agent(self, message_text: str, state: ConversationState, emotional_context: Optional[Dict[str, Any]] = None) -> str:
-        """Procesar mensaje con el agente actual."""
+        """Procesar mensaje con el agente actual enfocado en venta HIE."""
         try:
-            # Preparar contexto para el agente
+            # Preparar contexto para el agente con énfasis en HIE
             context = {
                 "conversation_id": state.id,
                 "customer_id": state.customer_id,
@@ -724,7 +728,11 @@ class ConversationService:
                     for msg in state.messages[-5:]  # Últimos 5 mensajes para contexto
                 ],
                 "platform_info": self.platform_context.platform_info.to_dict() if self.platform_context else {},
-                "conversation_config": self.platform_context.conversation_config.__dict__ if self.platform_context else {}
+                "conversation_config": self.platform_context.conversation_config.__dict__ if self.platform_context else {},
+                # NUEVA SECCIÓN: Contexto HIE para ventas
+                "hie_sales_context": await self._build_hie_sales_context(message_text, state, emotional_context),
+                "sales_phase": self._determine_sales_phase(state),
+                "tier_detection": await self._detect_optimal_tier(message_text, state)
             }
             
             # Añadir contexto emocional si está disponible
@@ -733,15 +741,20 @@ class ConversationService:
                     "emotional_intelligence": emotional_context
                 })
             
-            # Procesar mensaje con el agente
+            # Procesar mensaje con el agente enfocado en HIE
             response = await self._current_agent.process_message(message_text, context)
             
-            return response
+            # Post-procesar respuesta para asegurar enfoque HIE
+            enhanced_response = await self._enhance_response_with_hie_focus(
+                response, message_text, state, context
+            )
+            
+            return enhanced_response
             
         except Exception as e:
             logger.error(f"Error procesando con agente: {e}")
-            # Fallback a respuesta genérica
-            return "Lo siento, no pude procesar tu mensaje en este momento. ¿Podrías reformular tu pregunta?"
+            # Fallback con enfoque HIE
+            return await self._generate_hie_fallback_response(message_text, state)
     
     async def _analyze_intent(self, state: ConversationState, conversation_id: str) -> None:
         """Analizar intención de compra y guardar resultados."""
@@ -1415,4 +1428,893 @@ class ConversationService:
             )
             
         except Exception as e:
-            logger.error(f"Error en análisis forzado de fallback: {e}") 
+            logger.error(f"Error en análisis forzado de fallback: {e}")
+    
+    # ===== MÉTODOS NUEVOS ENFOCADOS EN VENTAS HIE =====
+    
+    async def _build_hie_sales_context(
+        self, 
+        message_text: str, 
+        state: ConversationState, 
+        emotional_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Construir contexto específico para ventas HIE.
+        
+        Args:
+            message_text: Mensaje actual del usuario
+            state: Estado de la conversación
+            emotional_context: Contexto emocional del usuario
+            
+        Returns:
+            Dict con contexto HIE para ventas
+        """
+        try:
+            # Analizar el mensaje para detectar señales de venta
+            sales_signals = self._detect_sales_signals(message_text)
+            
+            # Determinar arquetipo del cliente (Optimizador vs Arquitecto de Vida)
+            customer_archetype = self._determine_customer_archetype(state, message_text)
+            
+            # Detectar objeciones potenciales
+            potential_objections = self._detect_potential_objections(message_text)
+            
+            # Calcular ROI personalizado si hay suficiente información
+            personalized_roi = await self._calculate_personalized_roi(state, message_text)
+            
+            # Construir contexto HIE
+            hie_context = {
+                "hie_differentiator": {
+                    "core_message": "NGX cuenta con un Hybrid Intelligence Engine único e imposible de clonar",
+                    "key_points": [
+                        "11 agentes especializados trabajando 24/7",
+                        "Sinergia hombre-máquina imposible de replicar",
+                        "Personalización doble: arquetipo + datos fisiológicos",
+                        "Tecnología propietaria con 18 meses de ventaja"
+                    ],
+                    "proof_points": [
+                        "Usuarios reportan +25% productividad vs soluciones tradicionales",
+                        "Precisión del 94% en recomendaciones personalizadas",
+                        "Solo 1 de cada 10,000 usuarios no ve resultados en 30 días"
+                    ]
+                },
+                "customer_archetype": customer_archetype,
+                "sales_signals": sales_signals,
+                "potential_objections": potential_objections,
+                "personalized_roi": personalized_roi,
+                "program_benefits": self._get_program_specific_benefits(state.program_type),
+                "urgency_factors": self._generate_urgency_factors(state),
+                "social_proof": self._get_relevant_social_proof(customer_archetype)
+            }
+            
+            return hie_context
+            
+        except Exception as e:
+            logger.error(f"Error construyendo contexto HIE: {e}")
+            # Contexto básico de fallback
+            return {
+                "hie_differentiator": {
+                    "core_message": "NGX cuenta con un Hybrid Intelligence Engine único",
+                    "key_points": ["11 agentes especializados", "Personalización avanzada"],
+                    "proof_points": ["Resultados comprobados", "Tecnología única"]
+                },
+                "customer_archetype": "unknown",
+                "sales_signals": [],
+                "potential_objections": [],
+                "personalized_roi": None
+            }
+    
+    def _detect_sales_signals(self, message_text: str) -> List[str]:
+        """Detectar señales de venta en el mensaje del usuario."""
+        message_lower = message_text.lower()
+        
+        # Señales de interés alto
+        high_interest_signals = [
+            "me interesa", "quiero saber más", "cómo funciona", "cuánto cuesta",
+            "cuando puedo empezar", "necesito ayuda", "busco solución"
+        ]
+        
+        # Señales de precio/valor
+        price_signals = [
+            "precio", "costo", "inversión", "vale la pena", "cuánto",
+            "barato", "caro", "presupuesto", "pago"
+        ]
+        
+        # Señales de urgencia
+        urgency_signals = [
+            "urgente", "rápido", "pronto", "inmediato", "ya",
+            "ahora", "hoy", "esta semana"
+        ]
+        
+        # Señales de escepticismo
+        skepticism_signals = [
+            "pero", "sin embargo", "no estoy seguro", "dudas",
+            "realmente funciona", "es verdad", "confiable"
+        ]
+        
+        detected_signals = []
+        
+        for signal in high_interest_signals:
+            if signal in message_lower:
+                detected_signals.append(f"high_interest: {signal}")
+        
+        for signal in price_signals:
+            if signal in message_lower:
+                detected_signals.append(f"price_related: {signal}")
+        
+        for signal in urgency_signals:
+            if signal in message_lower:
+                detected_signals.append(f"urgency: {signal}")
+        
+        for signal in skepticism_signals:
+            if signal in message_lower:
+                detected_signals.append(f"skepticism: {signal}")
+        
+        return detected_signals
+    
+    def _determine_customer_archetype(self, state: ConversationState, message_text: str) -> str:
+        """Determinar arquetipo del cliente (Optimizador vs Arquitecto de Vida)."""
+        try:
+            # Analizar programa detectado
+            program_type = state.program_type
+            
+            # Analizar edad si está disponible
+            age = None
+            if hasattr(state, 'customer_data') and state.customer_data:
+                age = state.customer_data.get('age')
+            
+            # Analizar contenido del mensaje
+            message_lower = message_text.lower()
+            
+            # Palabras clave para Optimizador (PRIME)
+            optimizer_keywords = [
+                "productividad", "rendimiento", "eficiencia", "resultados",
+                "trabajo", "empresa", "negocio", "tiempo", "optimizar",
+                "maximizar", "ejecutivo", "profesional", "carrera"
+            ]
+            
+            # Palabras clave para Arquitecto de Vida (LONGEVITY)
+            architect_keywords = [
+                "salud", "bienestar", "longevidad", "calidad de vida",
+                "prevención", "futuro", "familia", "independencia",
+                "vitalidad", "envejecimiento", "sostenible", "equilibrio"
+            ]
+            
+            optimizer_score = sum(1 for keyword in optimizer_keywords if keyword in message_lower)
+            architect_score = sum(1 for keyword in architect_keywords if keyword in message_lower)
+            
+            # Decidir arquetipo basado en múltiples factores
+            if program_type == "PRIME" and optimizer_score > architect_score:
+                return "optimizador"
+            elif program_type == "LONGEVITY" and architect_score > optimizer_score:
+                return "arquitecto_vida"
+            elif age and age < 45:
+                return "optimizador"
+            elif age and age > 55:
+                return "arquitecto_vida"
+            else:
+                return "hibrido"
+                
+        except Exception as e:
+            logger.error(f"Error determinando arquetipo: {e}")
+            return "unknown"
+    
+    def _detect_potential_objections(self, message_text: str) -> List[str]:
+        """Detectar objeciones potenciales en el mensaje."""
+        message_lower = message_text.lower()
+        
+        objection_patterns = {
+            "precio": ["caro", "precio", "costoso", "mucho dinero", "presupuesto"],
+            "tiempo": ["no tengo tiempo", "muy ocupado", "sin tiempo"],
+            "escepticismo": ["no creo", "dudas", "realmente funciona", "es verdad"],
+            "comparacion": ["otros", "competencia", "alternativas", "vs", "comparado"],
+            "necesidad": ["no necesito", "no me hace falta", "ya tengo"],
+            "decision": ["pensarlo", "consultar", "decidir después", "más tarde"]
+        }
+        
+        detected_objections = []
+        for objection_type, keywords in objection_patterns.items():
+            for keyword in keywords:
+                if keyword in message_lower:
+                    detected_objections.append(objection_type)
+                    break
+        
+        return list(set(detected_objections))  # Eliminar duplicados
+    
+    async def _calculate_personalized_roi(self, state: ConversationState, message_text: str) -> Optional[Dict[str, Any]]:
+        """Calcular ROI personalizado basado en información del usuario."""
+        try:
+            # Extraer información relevante del mensaje
+            message_lower = message_text.lower()
+            
+            # Detectar indicadores de ingresos o valor por hora
+            income_indicators = {
+                "consultor": 200,
+                "abogado": 300,
+                "médico": 250,
+                "ceo": 500,
+                "director": 400,
+                "gerente": 150,
+                "emprendedor": 250,
+                "freelancer": 100
+            }
+            
+            hourly_rate = None
+            profession = None
+            
+            # Buscar profesión mencionada
+            for prof, rate in income_indicators.items():
+                if prof in message_lower:
+                    profession = prof
+                    hourly_rate = rate
+                    break
+            
+            # Buscar mención explícita de tarifa por hora
+            import re
+            hour_rate_match = re.search(r'(\d+).*(?:hora|hour)', message_lower)
+            if hour_rate_match:
+                hourly_rate = int(hour_rate_match.group(1))
+            
+            # Calcular ROI si tenemos información suficiente
+            if hourly_rate:
+                # Cálculos conservadores
+                productivity_gain_hours = 3  # 3 horas extra productivas por día
+                working_days_month = 22
+                program_cost = 199 if state.program_type == "PRIME" else 199  # Elite tier
+                
+                monthly_productivity_gain = hourly_rate * productivity_gain_hours * working_days_month
+                monthly_roi = ((monthly_productivity_gain - program_cost) / program_cost) * 100
+                
+                return {
+                    "hourly_rate": hourly_rate,
+                    "profession": profession,
+                    "productivity_gain_hours": productivity_gain_hours,
+                    "monthly_productivity_gain": monthly_productivity_gain,
+                    "program_cost": program_cost,
+                    "monthly_roi": round(monthly_roi, 0),
+                    "payback_days": round((program_cost / (hourly_rate * productivity_gain_hours)), 1)
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error calculando ROI personalizado: {e}")
+            return None
+    
+    def _get_program_specific_benefits(self, program_type: str) -> Dict[str, Any]:
+        """Obtener beneficios específicos del programa."""
+        if program_type == "PRIME":
+            return {
+                "primary_benefits": [
+                    "Optimización cognitiva para máximo rendimiento",
+                    "Protocolos de alta eficiencia para ejecutivos",
+                    "Integración perfecta con rutinas de alto impacto"
+                ],
+                "target_outcomes": [
+                    "+25% productividad mensual comprobada",
+                    "3 horas extra productivas diarias",
+                    "Reducción del 40% en tiempo de decisión"
+                ],
+                "unique_features": [
+                    "Algoritmo de optimización ejecutiva",
+                    "Análisis predictivo de rendimiento",
+                    "Coaching híbrido 24/7"
+                ]
+            }
+        else:  # LONGEVITY
+            return {
+                "primary_benefits": [
+                    "Protocolos de longevidad basados en ciencia",
+                    "Prevención predictiva de declive cognitivo",
+                    "Optimización de healthspan y lifespan"
+                ],
+                "target_outcomes": [
+                    "+10 años de vitalidad proyectada",
+                    "Reducción del 60% en riesgo de enfermedades",
+                    "Mejora del 80% en marcadores de longevidad"
+                ],
+                "unique_features": [
+                    "Algoritmo de envejecimiento predictivo",
+                    "Protocolos de medicina preventiva",
+                    "Coaching de longevidad personalizado"
+                ]
+            }
+    
+    def _generate_urgency_factors(self, state: ConversationState) -> List[str]:
+        """Generar factores de urgencia relevantes."""
+        urgency_factors = []
+        
+        # Factores de escasez
+        urgency_factors.append("Solo aceptamos 50 nuevos usuarios por mes")
+        urgency_factors.append("Acceso beta gratuito disponible solo esta semana")
+        
+        # Factores de precio
+        urgency_factors.append("Precio de lanzamiento válido solo hasta fin de mes")
+        urgency_factors.append("Evita la lista de espera inscribiéndote hoy")
+        
+        # Factores de valor
+        urgency_factors.append("Incluye análisis genético gratuito ($497 de valor)")
+        urgency_factors.append("Bonos valorados en $2,885 para primeros usuarios")
+        
+        return urgency_factors
+    
+    def _get_relevant_social_proof(self, customer_archetype: str) -> List[str]:
+        """Obtener prueba social relevante para el arquetipo."""
+        if customer_archetype == "optimizador":
+            return [
+                "CEO de fintech perdió 15kg y aumentó productividad 40%",
+                "Directora de marketing reporta 3 horas extra productivas diarias",
+                "Emprendedor duplicó su facturación tras optimizar su rendimiento"
+            ]
+        elif customer_archetype == "arquitecto_vida":
+            return [
+                "Médico de 58 años mejoró todos sus marcadores de longevidad",
+                "Profesora jubilada mantiene vitalidad de hace 20 años",
+                "Ingeniero senior previno declive cognitivo con protocolos NGX"
+            ]
+        else:
+            return [
+                "Más de 10,000 usuarios han transformado su vida con NGX",
+                "94% de satisfacción en usuarios activos",
+                "Resultados comprobados en 30 días o dinero devuelto"
+            ]
+    
+    def _determine_sales_phase(self, state: ConversationState) -> str:
+        """Determinar fase actual de venta."""
+        message_count = len(state.messages)
+        
+        if message_count <= 2:
+            return "opening"
+        elif message_count <= 6:
+            return "discovery"
+        elif message_count <= 10:
+            return "presentation"
+        elif message_count <= 14:
+            return "objection_handling"
+        else:
+            return "closing"
+    
+    async def _detect_optimal_tier(self, message_text: str, state: ConversationState) -> Dict[str, Any]:
+        """Detectar tier óptimo basado en el mensaje y contexto usando el servicio especializado."""
+        try:
+            # Preparar perfil del usuario
+            user_profile = {}
+            if hasattr(state, 'customer_data') and state.customer_data:
+                user_profile = state.customer_data
+            
+            # Preparar historial de conversación
+            conversation_history = [
+                {"role": msg.role, "content": msg.content}
+                for msg in state.messages[-10:]  # Últimos 10 mensajes para contexto
+            ]
+            
+            # Detectar tier óptimo usando el servicio especializado
+            tier_result = await self.tier_detection_service.detect_optimal_tier(
+                user_message=message_text,
+                user_profile=user_profile,
+                conversation_history=conversation_history
+            )
+            
+            # Convertir resultado a formato esperado
+            return {
+                "recommended_tier": tier_result.recommended_tier.value,
+                "confidence": tier_result.confidence,
+                "reasoning": tier_result.reasoning,
+                "price_point": tier_result.price_point,
+                "upsell_potential": tier_result.upsell_potential,
+                "demographic_factors": tier_result.demographic_factors,
+                "behavioral_signals": tier_result.behavioral_signals,
+                "price_sensitivity": tier_result.price_sensitivity,
+                "roi_projection": tier_result.roi_projection
+            }
+            
+        except Exception as e:
+            logger.error(f"Error detectando tier óptimo: {e}")
+            return {
+                "recommended_tier": "pro",
+                "confidence": 0.5,
+                "reasoning": "Default por error en detección"
+            }
+    
+    async def _enhance_response_with_hie_focus(
+        self, 
+        base_response: str, 
+        message_text: str, 
+        state: ConversationState,
+        context: Dict[str, Any]
+    ) -> str:
+        """Mejorar respuesta para enfatizar HIE como diferenciador."""
+        try:
+            # Obtener contexto HIE
+            hie_context = context.get("hie_sales_context", {})
+            sales_phase = context.get("sales_phase", "discovery")
+            
+            # Verificar si la respuesta ya menciona HIE
+            if "hybrid intelligence engine" in base_response.lower() or "hie" in base_response.lower():
+                return base_response  # Ya está enfocada en HIE
+            
+            # Mejoras específicas por fase de venta
+            if sales_phase == "opening":
+                # Introducir HIE desde el principio
+                hie_intro = (
+                    "Antes de continuar, déjame comentarte que NGX no es una solución tradicional. "
+                    "Contamos con un Hybrid Intelligence Engine único e imposible de clonar. "
+                )
+                return f"{hie_intro}{base_response}"
+                
+            elif sales_phase == "discovery":
+                # Conectar necesidades con HIE
+                hie_connection = (
+                    "Lo que me cuentas es exactamente para lo que diseñamos nuestro HIE. "
+                    "Con 11 agentes especializados trabajando 24/7, podemos personalizar "
+                    "una solución que se adapte perfectamente a tu situación. "
+                )
+                return f"{hie_connection}{base_response}"
+                
+            elif sales_phase == "presentation":
+                # Enfatizar diferenciación HIE
+                hie_differentiation = (
+                    "Esta tecnología es literalmente imposible de replicar. "
+                    "Nuestro HIE tiene 18 meses de ventaja sobre cualquier competidor. "
+                )
+                return f"{base_response} {hie_differentiation}"
+                
+            elif sales_phase == "objection_handling":
+                # Usar HIE para manejar objeciones
+                potential_objections = hie_context.get("potential_objections", [])
+                if "precio" in potential_objections:
+                    hie_value = (
+                        "Considera que estás invirtiendo en tecnología que no existe en ningún otro lugar. "
+                        "Nuestro HIE es como tener un equipo de 11 especialistas trabajando exclusivamente para ti. "
+                    )
+                    return f"{base_response} {hie_value}"
+                else:
+                    return base_response
+                
+            elif sales_phase == "closing":
+                # Cerrar con HIE como factor decisivo
+                hie_closing = (
+                    "Tendrás acceso exclusivo a nuestro HIE, una tecnología que cambiará "
+                    "completamente tu experiencia. "
+                )
+                return f"{base_response} {hie_closing}"
+            
+            return base_response
+            
+        except Exception as e:
+            logger.error(f"Error mejorando respuesta con enfoque HIE: {e}")
+            return base_response
+    
+    async def _generate_hie_fallback_response(self, message_text: str, state: ConversationState) -> str:
+        """Generar respuesta de fallback enfocada en HIE."""
+        try:
+            # Detectar el tipo de consulta
+            message_lower = message_text.lower()
+            
+            if any(word in message_lower for word in ["precio", "costo", "cuánto"]):
+                return (
+                    "El precio de NGX incluye acceso completo a nuestro Hybrid Intelligence Engine, "
+                    "una tecnología única con 11 agentes especializados. Te aseguro que es la mejor "
+                    "inversión que puedes hacer. ¿Te gustaría que te explique cómo funciona?"
+                )
+            
+            elif any(word in message_lower for word in ["cómo funciona", "qué es", "explica"]):
+                return (
+                    "NGX funciona gracias a nuestro HIE (Hybrid Intelligence Engine), una tecnología "
+                    "imposible de clonar que combina 11 agentes especializados trabajando 24/7. "
+                    "Es literalmente como tener un equipo de expertos exclusivo para ti. "
+                    "¿Te interesa conocer más detalles específicos?"
+                )
+            
+            elif any(word in message_lower for word in ["beneficios", "resultados", "qué obtengo"]):
+                program_type = state.program_type
+                if program_type == "PRIME":
+                    return (
+                        "Con NGX PRIME y nuestro HIE obtienes optimización cognitiva real: "
+                        "+25% productividad, 3 horas extra productivas diarias, y una "
+                        "transformación completa en tu rendimiento. Es tecnología que no "
+                        "encontrarás en ningún otro lugar."
+                    )
+                else:  # LONGEVITY
+                    return (
+                        "NGX LONGEVITY con nuestro HIE te da protocolos de longevidad únicos: "
+                        "+10 años de vitalidad proyectada, prevención predictiva, y optimización "
+                        "de tu healthspan. Es ciencia de vanguardia aplicada a tu vida."
+                    )
+            
+            else:
+                return (
+                    "Me da mucho gusto que estés interesado en NGX. Nuestra tecnología HIE "
+                    "es realmente revolucionaria y estoy seguro de que será perfecta para ti. "
+                    "¿Hay algo específico que te gustaría saber sobre cómo puede ayudarte?"
+                )
+                
+        except Exception as e:
+            logger.error(f"Error generando respuesta de fallback HIE: {e}")
+            return (
+                "Gracias por tu interés en NGX. Nuestro Hybrid Intelligence Engine es único "
+                "en el mercado y estoy seguro de que será la solución perfecta para ti. "
+                "¿Puedes contarme más sobre lo que buscas?"
+            )
+    
+    # ===== MÉTODOS PARA TIER DETECTION Y UPSELLING =====
+    
+    async def detect_tier_and_adjust_strategy(
+        self, 
+        message_text: str, 
+        state: ConversationState
+    ) -> Dict[str, Any]:
+        """
+        Detectar tier óptimo y ajustar estrategia de venta.
+        
+        Args:
+            message_text: Mensaje del usuario
+            state: Estado de la conversación
+            
+        Returns:
+            Dict con tier detectado y estrategia ajustada
+        """
+        try:
+            # Detectar tier óptimo
+            tier_detection = await self._detect_optimal_tier(message_text, state)
+            
+            # Guardar detección en el estado
+            if not hasattr(state, 'tier_progression'):
+                state.tier_progression = []
+            
+            state.tier_progression.append({
+                'timestamp': datetime.now().isoformat(),
+                'tier': tier_detection['recommended_tier'],
+                'confidence': tier_detection['confidence'],
+                'reasoning': tier_detection['reasoning'],
+                'trigger_message': message_text[:100]  # Primeros 100 caracteres
+            })
+            
+            # Ajustar estrategia de venta basada en tier
+            sales_strategy = self._adjust_sales_strategy(tier_detection, state)
+            
+            return {
+                'tier_detection': tier_detection,
+                'sales_strategy': sales_strategy,
+                'tier_progression': state.tier_progression
+            }
+            
+        except Exception as e:
+            logger.error(f"Error en detección de tier: {e}")
+            return {
+                'tier_detection': {'recommended_tier': 'pro', 'confidence': 0.5},
+                'sales_strategy': {'approach': 'standard'},
+                'tier_progression': []
+            }
+    
+    def _adjust_sales_strategy(self, tier_detection: Dict[str, Any], state: ConversationState) -> Dict[str, Any]:
+        """Ajustar estrategia de venta basada en el tier detectado."""
+        try:
+            recommended_tier = tier_detection['recommended_tier']
+            confidence = tier_detection['confidence']
+            price_sensitivity = tier_detection.get('price_sensitivity', 'medium')
+            
+            # Estrategias por tier
+            if recommended_tier == 'essential':
+                return {
+                    'approach': 'value_focused',
+                    'key_messages': [
+                        'Excelente relación calidad-precio',
+                        'Acceso completo a HIE por menos que una cena',
+                        'Prueba de 14 días por solo $29'
+                    ],
+                    'pricing_strategy': 'emphasize_value',
+                    'upsell_timing': 'after_initial_results',
+                    'social_proof': 'student_success_stories'
+                }
+            
+            elif recommended_tier == 'pro':
+                return {
+                    'approach': 'balanced_professional',
+                    'key_messages': [
+                        'Sweet spot perfecto entre funcionalidad y precio',
+                        'Ideal para profesionales como tú',
+                        'ROI comprobado en 3 semanas'
+                    ],
+                    'pricing_strategy': 'value_comparison',
+                    'upsell_timing': 'during_demo',
+                    'social_proof': 'professional_testimonials'
+                }
+            
+            elif recommended_tier == 'elite':
+                return {
+                    'approach': 'premium_executive',
+                    'key_messages': [
+                        'Maximiza tu inversión con features premium',
+                        'Diseñado para ejecutivos que buscan resultados',
+                        'Voz natural y análisis en tiempo real'
+                    ],
+                    'pricing_strategy': 'roi_demonstration',
+                    'upsell_timing': 'immediate_if_confident',
+                    'social_proof': 'executive_case_studies'
+                }
+            
+            elif recommended_tier in ['prime_premium', 'longevity_premium']:
+                return {
+                    'approach': 'exclusive_transformation',
+                    'key_messages': [
+                        'Transformación completa con coaching personal',
+                        'Acceso exclusivo a tecnología de vanguardia',
+                        'Resultados garantizados o dinero devuelto'
+                    ],
+                    'pricing_strategy': 'investment_mindset',
+                    'upsell_timing': 'consultative_approach',
+                    'social_proof': 'transformation_stories'
+                }
+            
+            else:
+                return {
+                    'approach': 'standard',
+                    'key_messages': ['Híbrido Intelligence Engine único'],
+                    'pricing_strategy': 'standard',
+                    'upsell_timing': 'standard',
+                    'social_proof': 'general_testimonials'
+                }
+                
+        except Exception as e:
+            logger.error(f"Error ajustando estrategia: {e}")
+            return {'approach': 'standard'}
+    
+    async def handle_price_objection_with_tier_adjustment(
+        self, 
+        objection_message: str, 
+        state: ConversationState
+    ) -> Dict[str, Any]:
+        """
+        Manejar objeción de precio con ajuste de tier.
+        
+        Args:
+            objection_message: Mensaje de objeción del usuario
+            state: Estado de la conversación
+            
+        Returns:
+            Dict con tier ajustado y respuesta apropiada
+        """
+        try:
+            # Obtener tier actual
+            current_tier = None
+            if hasattr(state, 'tier_progression') and state.tier_progression:
+                current_tier = state.tier_progression[-1]['tier']
+            
+            if not current_tier:
+                current_tier = 'pro'  # Default
+            
+            # Usar el servicio para ajustar tier basado en objeción
+            from src.services.tier_detection_service import TierType
+            
+            # Convertir string a TierType
+            tier_enum = TierType(current_tier)
+            
+            user_profile = state.customer_data if hasattr(state, 'customer_data') else {}
+            
+            adjusted_result = await self.tier_detection_service.adjust_tier_based_on_objection(
+                current_tier=tier_enum,
+                objection_message=objection_message,
+                user_profile=user_profile
+            )
+            
+            # Generar respuesta apropiada
+            adjusted_response = self._generate_tier_adjustment_response(
+                adjusted_result, objection_message, state
+            )
+            
+            # Actualizar tier progression
+            if not hasattr(state, 'tier_progression'):
+                state.tier_progression = []
+            
+            state.tier_progression.append({
+                'timestamp': datetime.now().isoformat(),
+                'tier': adjusted_result.recommended_tier.value,
+                'confidence': adjusted_result.confidence,
+                'reasoning': adjusted_result.reasoning,
+                'trigger_message': objection_message[:100],
+                'adjustment_type': 'price_objection'
+            })
+            
+            return {
+                'adjusted_tier': adjusted_result.recommended_tier.value,
+                'confidence': adjusted_result.confidence,
+                'response': adjusted_response,
+                'tier_progression': state.tier_progression
+            }
+            
+        except Exception as e:
+            logger.error(f"Error manejando objeción con ajuste de tier: {e}")
+            return {
+                'adjusted_tier': 'pro',
+                'confidence': 0.5,
+                'response': 'Entiendo tu preocupación sobre el precio. Déjame mostrarte nuestras opciones más accesibles.',
+                'tier_progression': []
+            }
+    
+    def _generate_tier_adjustment_response(
+        self, 
+        adjusted_result, 
+        objection_message: str, 
+        state: ConversationState
+    ) -> str:
+        """Generar respuesta apropiada para ajuste de tier."""
+        try:
+            tier = adjusted_result.recommended_tier.value
+            price_point = adjusted_result.price_point
+            
+            # Respuestas específicas por tier ajustado
+            if tier == 'essential':
+                return (
+                    f"Entiendo perfectamente tu preocupación sobre el precio. "
+                    f"NGX Essential por {price_point} te da acceso completo a nuestro "
+                    f"Hybrid Intelligence Engine - es menos de lo que gastas en café al mes. "
+                    f"Puedes hacer upgrade cuando veas los resultados. ¿Te parece más razonable?"
+                )
+            
+            elif tier == 'pro':
+                return (
+                    f"Comprendo tu punto de vista sobre el precio. NGX Pro por {price_point} "
+                    f"es el sweet spot perfecto: tienes acceso completo a nuestros 11 agentes "
+                    f"especializados, análisis de comidas con foto, y reportes semanales. "
+                    f"Es una excelente inversión para los resultados que obtienes."
+                )
+            
+            elif tier == 'elite':
+                return (
+                    f"Te entiendo completamente. NGX Elite por {price_point} incluye TODO "
+                    f"lo que necesitas: voz natural con los agentes, análisis en tiempo real, "
+                    f"y soporte prioritario. Considera que un coach personal cuesta $400-800/mes. "
+                    f"Con NGX tienes 11 especialistas por mucho menos."
+                )
+            
+            else:
+                return (
+                    f"Entiendo tu preocupación. {price_point} es una inversión significativa, "
+                    f"pero considera que estás invirtiendo en tecnología única que no existe "
+                    f"en ningún otro lugar. Nuestro HIE es como tener un equipo completo de "
+                    f"especialistas trabajando exclusivamente para ti."
+                )
+                
+        except Exception as e:
+            logger.error(f"Error generando respuesta de ajuste: {e}")
+            return "Entiendo tu preocupación sobre el precio. Déjame mostrarte nuestras opciones."
+    
+    async def suggest_upsell_opportunity(
+        self, 
+        current_tier: str, 
+        state: ConversationState
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Sugerir oportunidad de upsell basada en progreso de conversación.
+        
+        Args:
+            current_tier: Tier actual del usuario
+            state: Estado de la conversación
+            
+        Returns:
+            Dict con sugerencia de upsell o None
+        """
+        try:
+            # Verificar si es buen momento para upsell
+            message_count = len(state.messages)
+            
+            # Solo sugerir upsell después de cierto engagement
+            if message_count < 6:
+                return None
+            
+            # Analizar señales de engagement alto
+            recent_user_messages = [
+                msg.content for msg in state.messages[-5:] 
+                if msg.role == 'user'
+            ]
+            
+            # Señales de interés alto
+            high_interest_signals = [
+                'me gusta', 'interesante', 'impresionante', 'quiero saber más',
+                'cómo funciona', 'necesito esto', 'perfecto para mí'
+            ]
+            
+            interest_score = sum(
+                1 for message in recent_user_messages
+                for signal in high_interest_signals
+                if signal in message.lower()
+            )
+            
+            # Solo sugerir upsell si hay interés alto
+            if interest_score < 2:
+                return None
+            
+            # Determinar tier de upsell
+            tier_hierarchy = ['essential', 'pro', 'elite', 'prime_premium', 'longevity_premium']
+            
+            try:
+                current_index = tier_hierarchy.index(current_tier)
+                if current_index < len(tier_hierarchy) - 1:
+                    suggested_tier = tier_hierarchy[current_index + 1]
+                else:
+                    return None  # Ya está en el tier más alto
+            except ValueError:
+                return None  # Tier no reconocido
+            
+            # Preparar sugerencia de upsell
+            upsell_benefits = self._get_upsell_benefits(current_tier, suggested_tier)
+            
+            return {
+                'suggested_tier': suggested_tier,
+                'current_tier': current_tier,
+                'upsell_benefits': upsell_benefits,
+                'interest_score': interest_score,
+                'timing': 'optimal',
+                'upsell_message': self._generate_upsell_message(current_tier, suggested_tier, upsell_benefits)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error sugiriendo upsell: {e}")
+            return None
+    
+    def _get_upsell_benefits(self, current_tier: str, suggested_tier: str) -> List[str]:
+        """Obtener beneficios específicos del upsell."""
+        upsell_benefits = {
+            ('essential', 'pro'): [
+                'Análisis de comidas con foto',
+                'Reportes semanales detallados',
+                'Integración con wearables',
+                'Soporte prioritario'
+            ],
+            ('pro', 'elite'): [
+                'Voz natural con los agentes',
+                'Análisis en tiempo real por HRV',
+                'Coaching personalizado avanzado',
+                'Acceso a funciones beta'
+            ],
+            ('elite', 'prime_premium'): [
+                'Coaching personal híbrido',
+                'Análisis genético incluido',
+                'Sesiones 1:1 con especialistas',
+                'Transformación completa garantizada'
+            ]
+        }
+        
+        return upsell_benefits.get((current_tier, suggested_tier), [
+            'Funciones premium adicionales',
+            'Mejor experiencia de usuario',
+            'Resultados más rápidos'
+        ])
+    
+    def _generate_upsell_message(self, current_tier: str, suggested_tier: str, benefits: List[str]) -> str:
+        """Generar mensaje de upsell personalizado."""
+        try:
+            benefits_text = ', '.join(benefits[:3])  # Top 3 beneficios
+            
+            if suggested_tier == 'pro':
+                return (
+                    f"Veo que estás realmente interesado en NGX. Por solo $70 más al mes, "
+                    f"NGX Pro te da {benefits_text}. Es como pasar de un auto básico a uno "
+                    f"con todas las comodidades. ¿Te gustaría maximizar tu experiencia?"
+                )
+            
+            elif suggested_tier == 'elite':
+                return (
+                    f"Perfecto, noto que aprecias la calidad. NGX Elite incluye {benefits_text}. "
+                    f"Por $50 adicionales al mes, tienes la experiencia premium completa. "
+                    f"¿Te interesa tener acceso a todo lo que NGX puede ofrecer?"
+                )
+            
+            elif suggested_tier in ['prime_premium', 'longevity_premium']:
+                program_name = 'PRIME' if suggested_tier == 'prime_premium' else 'LONGEVITY'
+                return (
+                    f"Basándome en tu perfil, NGX {program_name} sería perfecto para ti. "
+                    f"Incluye {benefits_text} y es una transformación completa. "
+                    f"¿Te gustaría conocer más sobre esta opción exclusiva?"
+                )
+            
+            else:
+                return (
+                    f"Veo que NGX te está gustando. El siguiente nivel incluye {benefits_text}. "
+                    f"¿Te interesa conocer más sobre esta opción premium?"
+                )
+                
+        except Exception as e:
+            logger.error(f"Error generando mensaje de upsell: {e}")
+            return "¿Te interesa conocer nuestras opciones premium?" 

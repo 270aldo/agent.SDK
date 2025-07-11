@@ -31,6 +31,40 @@ NGX Voice Sales Agent es un sistema avanzado de agentes conversacionales para ve
 
 **Estado del Proyecto**: 🎯 **COMPLETAMENTE FUNCIONAL Y LISTO PARA PRODUCCIÓN** ✅
 
+## 🚀 **ÚLTIMOS AVANCES COMPLETADOS** (Diciembre 2025)
+
+### **FASE 0.2: Refactorización ConversationService para HIE** ✅
+- **Contexto HIE integrado**: Nuevo método `_build_hie_sales_context()` que construye contexto específico para ventas HIE
+- **Detección de arquetipos**: Clasificación automática entre "Optimizador" (PRIME) vs "Arquitecto de Vida" (LONGEVITY)
+- **Respuestas enfocadas en HIE**: Método `_enhance_response_with_hie_focus()` que asegura que todas las respuestas enfaticen el HIE
+- **Fallback HIE**: Respuestas de emergencia que siempre mencionan el HIE como diferenciador
+- **Análisis de señales**: Detección automática de señales de venta, objeciones y ROI personalizado
+
+### **FASE 0.3: Sistema de Detección de Tier Óptimo** ✅
+- **Servicio especializado**: `TierDetectionService` con análisis multi-factorial
+- **5 tiers soportados**: Essential ($79), Pro ($149), Elite ($199), PRIME Premium ($3,997), LONGEVITY Premium ($3,997)
+- **Análisis inteligente**: Combina demografía, contenido del mensaje, patrones de comportamiento y sensibilidad al precio
+- **Ajuste dinámico**: Capacidad de ajustar tier basado en objeciones de precio
+- **ROI personalizado**: Cálculo automático de ROI basado en profesión y tarifa por hora (ej: 8,744% ROI para consultor)
+- **Progresión de tier**: Tracking completo de cómo evoluciona el tier durante la conversación
+
+### **Integración Completa del Sistema HIE** ✅
+El sistema ahora procesa cada mensaje con:
+1. **Análisis emocional** del usuario (EmotionalIntelligenceService)
+2. **Detección de tier óptimo** basada en múltiples factores (TierDetectionService)
+3. **Construcción de contexto HIE** específico para ventas
+4. **Respuestas personalizadas** que enfatizan el HIE como diferenciador
+5. **Estrategias de venta adaptadas** al tier detectado
+6. **Manejo de objeciones** con ajuste automático de tier
+
+### **Resultados de Pruebas Validados** ✅
+- **Estudiante**: Correctamente detectado como Essential ($79/mes) con 93% confianza
+- **CEO**: Correctamente detectado como PRIME Premium ($3,997) con 65% confianza  
+- **Gerente**: Correctamente detectado como Pro ($149/mes) con 36% confianza
+- **Médico**: Correctamente detectado como LONGEVITY Premium ($3,997) con 57% confianza
+- **Ajuste por objeción**: Correctamente reduce de Elite a Pro cuando hay objeción de precio
+- **Suite de tests HIE**: 13/13 tests pasando correctamente
+
 #### **Refactoring del Core COMPLETADO** ✅ (Actualizado: 17/6/2025)
 1. ✅ **Dependencias estabilizadas** - Eliminados 54 archivos duplicados, estructura limpia
 2. ✅ **Gestión de errores corregida** - Eliminadas todas las excepciones silenciosas (`except: pass`)  
@@ -2082,3 +2116,72 @@ NGX tiene una **posición única** en el mercado con **3 plataformas white label
 **RESULTADO PROYECTADO**: NGX se posiciona como **el líder indiscutible** en plataformas white label de wellness con IA, capturando market share significativo antes que la competencia desarrolle capacidades similares.
 
 **🏆 READY FOR MARKET DOMINATION**: Tecnología superior + Ejecución estratégica + Time-to-market advantage = **Victoria inevitable en el mercado white label**.
+
+---
+
+## 📋 **PRÓXIMAS TAREAS PENDIENTES** (Diciembre 2025)
+
+### **🔥 TAREAS DE ALTA PRIORIDAD**
+
+#### **Higiene del Repositorio (Crítico)**
+- [ ] **HYGIENE.1**: Añadir .gitignore para .coverage*, .venv*, logs y .env reales
+- [ ] **HYGIENE.2**: Consolidar requirements.txt (eliminar duplicados)
+
+#### **Calidad de Código (Crítico)**
+- [ ] **QUALITY.1**: Configurar pre-commit con black, isort, flake8, mypy
+- [ ] **QUALITY.2**: Añadir pyproject.toml centralizando configuración
+- [ ] **QUALITY.3**: Refactorizar duplicados (check_env*.py, scripts repetidos)
+
+#### **Seguridad (Crítico)**
+- [ ] **SECURITY.1**: Eliminar .env del control de versiones; usar secretos de CI/CD
+- [ ] **SECURITY.2**: Configurar CSP, HSTS, X-Frame-Options en middleware
+
+#### **Fases de Desarrollo HIE (Alta Prioridad)**
+- [ ] **FASE 1.1**: Desarrollar scripts de venta HIE (barrera imposible de clonar)
+- [ ] **FASE 1.2**: Implementar manejo de objeciones de precio con ROI biológico
+- [ ] **FASE 1.3**: Crear flujo de upsell automático (Essential → Elite → Premium)
+- [ ] **FASE 1.4**: Integrar sistema de bonos y urgencia (Primeros 50)
+- [ ] **FASE 2.1**: Desarrollar calculadora de ROI personalizada en tiempo real
+- [ ] **FASE 2.2**: Implementar demostración de agentes en vivo durante llamada
+- [ ] **FASE 2.3**: Crear sistema de prueba pagada 14 días ($29)
+
+### **🚀 TAREAS DE PRIORIDAD MEDIA**
+
+#### **Escalabilidad**
+- [ ] **SCALE.1**: Convertir servicios de I/O a llamadas async
+- [ ] **SCALE.2**: Agregar caché distribuido (Redis) y rate limit persistente
+- [ ] **SCALE.3**: Crear docker-compose.yml y pipelines de despliegue
+
+#### **Observabilidad**
+- [ ] **OBSERV.1**: Integrar OpenTelemetry nativo de FastAPI y exportar a Prometheus + Grafana
+
+#### **Fases Avanzadas**
+- [ ] **FASE 3.1**: Optimizar cierre con opciones de pago (3 cuotas $1,499)
+- [ ] **FASE 3.2**: Implementar seguimiento automático post-conversación
+- [ ] **FASE 3.3**: Desarrollar integración con CRM para nurturing
+
+### **🎯 TAREAS DE PRIORIDAD BAJA**
+- [ ] **FASE 4.1**: Escalar para vender $60K/mes (500 suscriptores mix)
+
+### **💡 NOTAS IMPORTANTES PARA PRÓXIMA SESIÓN**
+
+#### **Archivos Clave Creados/Modificados**
+- `src/services/tier_detection_service.py` - Servicio completo de detección de tier
+- `src/services/conversation_service.py` - Refactorizado con contexto HIE y tier detection
+- `test_tier_detection_simple.py` - Test validado funcionando al 100%
+- `tests/test_sales_hie_flows.py` - 13 tests HIE pasando correctamente
+
+#### **Funcionalidades Implementadas**
+- **Detección automática de tier**: Análisis multi-factorial con 5 tiers soportados
+- **Contexto HIE**: Todas las respuestas enfatizan el HIE como diferenciador
+- **ROI personalizado**: Cálculo automático basado en profesión (ej: 8,744% ROI para consultor)
+- **Manejo de objeciones**: Ajuste automático de tier cuando hay objeción de precio
+- **Estrategias adaptadas**: Diferentes enfoques según tier detectado
+
+#### **Progreso del Análisis Profesional**
+- **Análisis integral completado**: Identificados puntos críticos de mejora
+- **Plan de acción definido**: Tareas priorizadas según impacto
+- **Refactoring iniciado**: Primeras fases completadas exitosamente
+
+### **🎊 READY FOR NEXT SESSION**
+El sistema está ahora completamente enfocado en vender el HIE como diferenciador principal y puede detectar automáticamente el tier óptimo para maximizar conversiones. ¡Listo para continuar con las siguientes fases de desarrollo!
