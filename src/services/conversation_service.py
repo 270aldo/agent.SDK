@@ -1539,14 +1539,14 @@ class ConversationService:
             # Detectar si hay objeción de precio para manejo específico
             objection_detected = self._detect_price_objection(message_text)
             
-            # Construir contexto HIE (Hybrid Intelligence Engine) avanzado
+            # Construir contexto HIE (Motor de Hibridación Inteligente) avanzado
             hie_context = {
-                "hybrid_intelligence_engine": {
-                    "core_message": "Hybrid Intelligence Engine - sistema de 11 agentes especializados imposible de clonar",
+                "motor_hibridacion_inteligente": {
+                    "core_message": "Motor de Hibridación Inteligente - sistema de 2 capas para personalización radical",
                     "tier_detected": tier_info.get('tier', 'Pro'),
                     "confidence": tier_info.get('confidence', 0.5),
                     "pricing": tier_info.get('pricing', {}),
-                    "specialization": "11 agentes IA trabajando en conjunto para tu éxito"
+                    "specialization": "9 agentes NGX coordinados por NEXUS para tu éxito"
                 },
                 "conversation_phase": conversation_phase,
                 "tier_info": tier_info,
@@ -2144,7 +2144,7 @@ class ConversationService:
                 # Introducir HIE desde el principio
                 hie_intro = (
                     "Antes de continuar, déjame comentarte que NGX no es una solución tradicional. "
-                    "Contamos con un Hybrid Intelligence Engine único e imposible de clonar. "
+                    "Contamos con un Motor de Hibridación Inteligente único e imposible de clonar. "
                 )
                 return f"{hie_intro}{base_response}"
                 
@@ -2199,8 +2199,8 @@ class ConversationService:
             
             if any(word in message_lower for word in ["precio", "costo", "cuánto"]):
                 return (
-                    "El precio de NGX incluye acceso completo a nuestro Hybrid Intelligence Engine, "
-                    "una tecnología única con 11 agentes especializados. Te aseguro que es la mejor "
+                    "El precio de NGX incluye acceso completo a nuestro Motor de Hibridación Inteligente, "
+                    "una tecnología única con 9 agentes especializados. Te aseguro que es la mejor "
                     "inversión que puedes hacer. ¿Te gustaría que te explique cómo funciona?"
                 )
             
