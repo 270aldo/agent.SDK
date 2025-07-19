@@ -54,7 +54,6 @@ class ModelType(Enum):
     STRATEGY_RECOMMENDER = "strategy_recommender"
 
 
-@dataclass
 class ExperimentVariant(BaseModel):
     """Variante de un experimento A/B."""
     variant_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -66,7 +65,6 @@ class ExperimentVariant(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
 
 
-@dataclass  
 class MLExperiment(BaseModel):
     """Experimento de Machine Learning A/B."""
     experiment_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -109,7 +107,6 @@ class MLExperiment(BaseModel):
         return v
 
 
-@dataclass
 class ConversationMetrics(BaseModel):
     """Métricas detalladas de una conversación."""
     # Métricas de duración y flujo
@@ -137,7 +134,6 @@ class ConversationMetrics(BaseModel):
     hie_explanation_effectiveness: float = Field(ge=0.0, le=1.0)
 
 
-@dataclass
 class ConversationOutcomeRecord(BaseModel):
     """Registro completo del outcome de una conversación para ML."""
     outcome_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -189,7 +185,6 @@ class ConversationOutcomeRecord(BaseModel):
         return min(1.0, base_score + quality_bonus)
 
 
-@dataclass
 class LearnedModel(BaseModel):
     """Modelo entrenado y listo para deployment."""
     model_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -224,7 +219,6 @@ class LearnedModel(BaseModel):
         return self.performance_metrics[metric] > other_model.performance_metrics[metric]
 
 
-@dataclass
 class IdentifiedPattern(BaseModel):
     """Patrón identificado por el sistema de aprendizaje."""
     pattern_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -253,7 +247,6 @@ class IdentifiedPattern(BaseModel):
     validation_frequency_days: int = 7
 
 
-@dataclass
 class AdaptiveLearningConfig(BaseModel):
     """Configuración del sistema de aprendizaje adaptativo."""
     # Configuración de experimentos

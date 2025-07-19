@@ -5,11 +5,15 @@ from fastapi.security import OAuth2PasswordBearer
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
-import os
+import asyncio
 import time
 import uuid
-from dotenv import load_dotenv
+from datetime import datetime
+from contextlib import asynccontextmanager
 
+# Import configuration and security
+from src.config import settings, Environment
+from src.infrastructure.security import secrets_manager, validate_secrets
 from src.utils.structured_logging import StructuredLogger
 from src.utils.observability import init_observability
 
@@ -24,60 +28,107 @@ from .routers import predictive
 from .routers import model_training
 from .routers import auth
 
-# Cargar variables de entorno
-load_dotenv()
-
-# Configurar logging estructurado
-log_level = os.getenv("LOG_LEVEL", "INFO")
-log_file = os.getenv("LOG_FILE", "logs/api.log")
-include_stack_info = os.getenv("ENVIRONMENT", "production").lower() != "production"
-
+# Configure structured logging from settings
 StructuredLogger.setup_logging(
-    log_level=log_level,
-    log_file=log_file,
-    include_stack_info=include_stack_info
+    log_level=settings.log_level,
+    log_file=settings.log_file,
+    include_stack_info=settings.log_include_stack_info
 )
 
-# Obtener logger para el módulo principal
+# Get logger for main module
 logger = StructuredLogger.get_logger("api.main")
 
-# Crear aplicación FastAPI
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Manage application lifecycle.
+    
+    Handles startup and shutdown events with proper resource management.
+    """
+    # Startup
+    logger.info(f"Starting {settings.app_name} v{settings.app_version}")
+    logger.info(f"Environment: {settings.environment}")
+    
+    # Validate required secrets
+    try:
+        secrets_valid = await validate_secrets()
+        if not secrets_valid:
+            logger.error("Required secrets validation failed")
+            if settings.is_production:
+                raise RuntimeError("Cannot start in production without required secrets")
+            else:
+                logger.warning("Running in development mode with missing secrets")
+    except Exception as e:
+        logger.error(f"Error validating secrets: {e}")
+        if settings.is_production:
+            raise
+    
+    # Log safe configuration
+    logger.info("Configuration loaded successfully")
+    logger.debug(f"Safe config: {settings.dict_safe()}")
+    
+    # Initialize services
+    logger.info("Initializing services...")
+    
+    # Import here to avoid circular imports
+    from src.services.conversation_service import ConversationService
+    from src.api.routers import conversation as conv_router
+    
+    # Create and initialize conversation service
+    conversation_service = ConversationService()
+    await conversation_service.initialize()
+    
+    # Inject into router
+    conv_router.conversation_service = conversation_service
+    
+    logger.info("API startup complete")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down API...")
+    # Add cleanup tasks here (close DB connections, etc.)
+    logger.info("API shutdown complete")
+
+
+# Create FastAPI application with lifespan
 app = FastAPI(
-    title="NGX Sales Agent API",
-    description="API para el Agente de Ventas NGX con IA conversacional",
-    version="0.1.0",
+    title=settings.app_name,
+    description="Elite conversational AI system for sales automation",
+    version=settings.app_version,
+    lifespan=lifespan,
+    docs_url="/docs" if not settings.is_production else None,
+    redoc_url="/redoc" if not settings.is_production else None,
 )
-# Inicializar observabilidad (trazas y métricas)
+
+# Initialize observability
 init_observability(app)
 
-# Configurar CORS
-allowed_origins = os.getenv("ALLOWED_ORIGINS")
-if not allowed_origins:
-    logger.error("ALLOWED_ORIGINS environment variable is required but not set")
-    raise ValueError("ALLOWED_ORIGINS environment variable must be set for security")
-
+# Configure CORS from settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins.split(","),
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept"],
+    allow_origins=settings.allowed_origins,
+    allow_credentials=settings.allow_credentials,
+    allow_methods=settings.allow_methods,
+    allow_headers=settings.allow_headers,
     expose_headers=["X-Request-ID", "X-Rate-Limit-Limit", "X-Rate-Limit-Remaining", "X-Rate-Limit-Reset"]
 )
 
-# Configurar headers de seguridad
+# Configure security headers
 app.add_middleware(SecurityHeadersMiddleware)
 
-# Configurar limitador de tasa
-app.add_middleware(
-    RateLimiter,
-    requests_per_minute=int(os.getenv("RATE_LIMIT_PER_MINUTE", "60")),
-    requests_per_hour=int(os.getenv("RATE_LIMIT_PER_HOUR", "1000")),
-    admin_exempt=True,
-    whitelist_ips=os.getenv("RATE_LIMIT_WHITELIST_IPS", "").split(","),
-    whitelist_paths=["/docs", "/redoc", "/openapi.json"],
-    get_user_id=get_user_from_request
-)
+# Configure rate limiting from settings
+if settings.rate_limit_enabled:
+    app.add_middleware(
+        RateLimiter,
+        requests_per_minute=settings.rate_limit_per_minute,
+        requests_per_hour=settings.rate_limit_per_hour,
+        admin_exempt=True,
+        whitelist_ips=settings.rate_limit_whitelist_ips,
+        whitelist_paths=["/docs", "/redoc", "/openapi.json", "/health"],
+        get_user_id=get_user_from_request
+    )
 
 # Middleware para registro de solicitudes y respuestas
 @app.middleware("http")
@@ -163,35 +214,18 @@ app.add_exception_handler(Exception, internal_exception_handler)
 
 @app.get("/health")
 async def health_check():
-    """Endpoint para verificar que la API está funcionando."""
-    return {"status": "ok", "message": "NGX Sales Agent API está funcionando"}
-
-@app.on_event("startup")
-async def startup_event():
-    """Evento que se ejecuta al iniciar la aplicación."""
-    logger.info("Iniciando aplicación NGX Sales Agent API...")
+    """
+    Health check endpoint.
     
-    # Verificar configuración de APIs
-    required_env_vars = [
-        "OPENAI_API_KEY", 
-        "ELEVENLABS_API_KEY", 
-        "SUPABASE_URL", 
-        "SUPABASE_ANON_KEY",
-        "JWT_SECRET"
-    ]
-    missing_vars = [var for var in required_env_vars if not os.getenv(var)]
-    
-    if missing_vars:
-        logger.warning(f"Faltan variables de entorno: {', '.join(missing_vars)}")
-        
-        # Generar advertencia específica para JWT_SECRET
-        if "JWT_SECRET" in missing_vars:
-            logger.warning("JWT_SECRET no está configurado. Se utilizará una clave predeterminada. " +
-                          "Esto es inseguro para entornos de producción.")
-    else:
-        logger.info("Todas las variables de entorno requeridas están configuradas")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Evento que se ejecuta al detener la aplicación."""
-    logger.info("Deteniendo aplicación NGX Sales Agent API...") 
+    Returns basic health status and application information.
+    """
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": settings.app_version,
+        "environment": settings.environment,
+        "services": {
+            "api": {"status": "up"},
+            "secrets": {"status": "configured" if await validate_secrets() else "missing"}
+        }
+    } 

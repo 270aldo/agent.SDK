@@ -15,8 +15,14 @@ logger = logging.getLogger(__name__)
 # Crear router
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
-# Instancia del servicio (singleton)
-conversation_service = ConversationService()
+# Instancia del servicio (será inicializada en lifespan)
+conversation_service: Optional[ConversationService] = None
+
+def get_conversation_service() -> ConversationService:
+    """Dependency para obtener el servicio de conversación."""
+    if conversation_service is None:
+        raise RuntimeError("ConversationService no ha sido inicializado")
+    return conversation_service
 
 # Modelos para la API
 class StartConversationRequest(BaseModel):
@@ -36,13 +42,16 @@ class ConversationResponse(BaseModel):
     message: Optional[str] = None
 
 @router.post("/start", response_model=ConversationResponse)
-async def start_conversation(request: StartConversationRequest):
+async def start_conversation(
+    request: StartConversationRequest,
+    service: ConversationService = Depends(get_conversation_service)
+):
     """
     Iniciar una nueva conversación.
     """
     try:
         # Iniciar conversación
-        state = await conversation_service.start_conversation(
+        state = await service.start_conversation(
             customer_data=request.customer_data,
             program_type=request.program_type
         )
@@ -61,13 +70,17 @@ async def start_conversation(request: StartConversationRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{conversation_id}/message", response_model=ConversationResponse)
-async def send_message(conversation_id: str, request: MessageRequest):
+async def send_message(
+    conversation_id: str,
+    request: MessageRequest,
+    service: ConversationService = Depends(get_conversation_service)
+):
     """
     Enviar un mensaje a una conversación existente.
     """
     try:
         # Procesar mensaje
-        state, audio_stream = await conversation_service.process_message(
+        state, audio_stream = await service.process_message(
             conversation_id=conversation_id,
             message_text=request.message
         )
@@ -95,7 +108,7 @@ async def get_audio_response(conversation_id: str):
     """
     try:
         # Recuperar estado de la conversación
-        state = await conversation_service._get_conversation_state(conversation_id)
+        state = await service._get_conversation_state(conversation_id)
         if not state:
             logger.error(f"No se encontró conversación con ID {conversation_id}")
             raise HTTPException(status_code=404, detail=f"Conversación no encontrada: {conversation_id}")
@@ -110,7 +123,7 @@ async def get_audio_response(conversation_id: str):
         last_message = assistant_messages[-1].content
         
         # Convertir a audio
-        audio_stream = await conversation_service.voice_engine.text_to_speech_async(
+        audio_stream = await service.voice_engine.text_to_speech_async(
             text=last_message,
             program_type=state.program_type,
             gender="male"  # Por defecto usamos voz masculina
@@ -131,13 +144,16 @@ async def get_audio_response(conversation_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{conversation_id}/end", response_model=ConversationResponse)
-async def end_conversation(conversation_id: str):
+async def end_conversation(
+    conversation_id: str,
+    service: ConversationService = Depends(get_conversation_service)
+):
     """
     Finalizar una conversación.
     """
     try:
         # Finalizar conversación
-        state = await conversation_service.end_conversation(conversation_id)
+        state = await service.end_conversation(conversation_id)
         
         # Obtener el último mensaje (despedida)
         last_message = state.messages[-1].content if state.messages else None
@@ -162,7 +178,7 @@ async def get_conversation(conversation_id: str):
     """
     try:
         # Recuperar estado de la conversación
-        state = await conversation_service._get_conversation_state(conversation_id)
+        state = await service._get_conversation_state(conversation_id)
         if not state:
             logger.error(f"No se encontró conversación con ID {conversation_id}")
             raise HTTPException(status_code=404, detail=f"Conversación no encontrada: {conversation_id}")

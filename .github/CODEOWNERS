@@ -1,0 +1,47 @@
+# CODEOWNERS for NGX Voice Sales Agent
+# This file defines who is responsible for code in this repository
+
+# Default owners for everything in the repo
+* @270aldo
+
+# Backend Python code
+/src/ @270aldo
+/tests/ @270aldo
+*.py @270aldo
+
+# API and routes
+/src/api/ @270aldo
+/src/api/routers/ @270aldo
+
+# ML and AI services
+/src/services/adaptive_learning_service.py @270aldo
+/src/services/pattern_recognition_engine.py @270aldo
+/src/services/prompt_optimizer_service.py @270aldo
+/src/services/ab_testing_framework.py @270aldo
+
+# Infrastructure and configuration
+/docker/ @270aldo
+/scripts/ @270aldo
+/.github/ @270aldo
+*.yml @270aldo
+*.yaml @270aldo
+
+# Documentation
+/docs/ @270aldo
+*.md @270aldo
+
+# SDK
+/sdk/ @270aldo
+
+# Database migrations
+/scripts/migrations/ @270aldo
+
+# Security-sensitive files
+/src/auth/ @270aldo
+/src/config/secrets.py @270aldo
+.env* @270aldo
+
+# Dependencies
+requirements*.txt @270aldo
+package*.json @270aldo
+pyproject.toml @270aldo

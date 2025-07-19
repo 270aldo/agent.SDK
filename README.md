@@ -1,6 +1,6 @@
-# 🚀 NGX Revolutionary Voice Agent System
+# 🚀 NGX Voice Sales Agent
 
-**The Future of Conversational Sales - Available Today**
+**Sistema Especializado de Ventas Conversacionales con IA**
 
 [![Revolutionary](https://img.shields.io/badge/Status-Revolutionary-ff6b6b?style=for-the-badge&logo=rocket)](https://github.com/270aldo/agent.SDK)
 [![Production Ready](https://img.shields.io/badge/Ready-Production-00d4aa?style=for-the-badge&logo=checkmark)](https://github.com/270aldo/agent.SDK)
@@ -8,16 +8,17 @@
 
 ---
 
-## 🎯 **Revolutionary Voice Agent System**
+## 🎯 **Agente de Ventas Inteligente para NGX**
 
-El **NGX Voice Agent** es un sistema revolucionario de agentes conversacionales que transforma cualquier punto de contacto digital en una experiencia de ventas personalizada e inteligente. Con **una sola línea de código**, convierte landing pages, lead magnets, blogs y aplicaciones en poderosas herramientas de conversión.
+El **NGX Voice Sales Agent** es un agente de ventas conversacional especializado que conoce profundamente los servicios, programas y audiencia de NGX. Este agente único (no es un sistema multi-agente) transforma cualquier punto de contacto digital en una experiencia de ventas personalizada y efectiva. Con **una sola línea de código**, convierte landing pages, lead magnets, blogs y aplicaciones en poderosas herramientas de conversión para vender los programas NGX.
 
-### **🌟 Lo Que Hace Único a NGX**
+### **🌟 Características del Agente de Ventas NGX**
 
-- **🎨 Energy Ball Avatar 3D** - Avatar WebGL con animaciones dinámicas
-- **🧠 IA Contextual Avanzada** - Personalización por touchpoint en tiempo real  
-- **⚡ Triggers Inteligentes** - Detección de momentos óptimos para engagement
-- **💎 Glass Morphism UI** - Interfaz futurista con micro-interacciones
+- **🎯 Conocimiento Profundo de NGX** - Domina todos los programas y precios (AGENTS ACCESS, Hybrid Coaching)
+- **🧠 ML Adaptativo** - Aprende y mejora automáticamente con cada conversación
+- **💰 Detección Inteligente de Tier** - Identifica el plan óptimo para cada cliente
+- **🎨 Interfaz 3D Revolucionaria** - Avatar WebGL con animaciones dinámicas
+- **📈 ROI Calculator Integrado** - Demuestra valor específico por profesión
 - **📏 Una Línea de Integración** - `<script data-touchpoint="landing-page">`
 
 ### **🔥 Características Revolucionarias**
@@ -28,11 +29,11 @@ El **NGX Voice Agent** es un sistema revolucionario de agentes conversacionales 
 - **Voice Activity Detection** con respuesta visual en tiempo real
 - **Performance optimizado** para 60fps en dispositivos móviles
 
-#### **🧠 IA Contextual Avanzada** 
-- **Personalización por touchpoint** con diferentes flows
-- **Intent detection** para 10+ tipos de intención
-- **Dynamic personality** adaptation (tone, approach, energy)
-- **Conversation progression** de discovery a decision
+#### **🧠 Inteligencia de Ventas NGX** 
+- **Conocimiento completo** de AGENTS ACCESS (Essential $79, Pro $149, Elite $199)
+- **Dominio de Hybrid Coaching** (PRIME $3,997, LONGEVITY $3,997)
+- **Enfoque consultivo** empático - escuchar primero, vender después
+- **HIE Integration** - Explica beneficios únicos del Human Intelligence Ecosystem
 
 #### **⚡ Smart Trigger Engine**
 - **Exit intent detection** con sensibilidad configurable
@@ -333,11 +334,13 @@ Para documentación completa: `http://localhost:8000/docs`
 
 ---
 
-## 🎯 **El Futuro de las Ventas Digitales**
+## 🎯 **El Futuro de las Ventas NGX**
 
-El **NGX Revolutionary Voice Agent System** no es solo una herramienta más - es una **transformación fundamental** en cómo las empresas se conectan con sus clientes potenciales.
+El **NGX Voice Sales Agent** es un agente de ventas especializado que domina completamente el ecosistema NGX - desde los programas AGENTS ACCESS hasta Hybrid Coaching. No es un sistema multi-agente, sino UN agente altamente optimizado para vender los servicios NGX.
 
-**🔮 Resultado**: Convierte cada touchpoint digital en una oportunidad de conversación personalizada, escalable e inteligente.
+**🔮 Resultado**: Convierte cada touchpoint digital en una oportunidad de venta consultiva, personalizada y efectiva para los programas NGX.
+
+**Nota Importante**: Este proyecto contiene un agente de ventas especializado. Los 11 agentes NGX (NEXUS, BLAZE, etc.) pertenecen al proyecto GENESIS, que es independiente de este sistema.
 
 ---
 

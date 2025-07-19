@@ -7,6 +7,8 @@ tokens JWT utilizados para la autenticación y autorización en la API.
 
 import jwt
 import time
+import asyncio
+import secrets
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Any
 import os
@@ -18,11 +20,84 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Configuración de JWT
-JWT_SECRET = os.getenv("JWT_SECRET")
-if not JWT_SECRET:
-    logger.error("JWT_SECRET environment variable is required but not set")
-    raise ValueError("JWT_SECRET environment variable must be set for security")
+# Import secrets manager
+try:
+    from src.infrastructure.security import secrets_manager, get_secret
+except ImportError:
+    # Fallback for backward compatibility
+    logger.warning("Secrets manager not available, using environment variables directly")
+    secrets_manager = None
+    async def get_secret(key: str, required: bool = True) -> Optional[str]:
+        value = os.getenv(key)
+        if not value and required:
+            logger.error(f"Required secret not found: {key}")
+        return value
+
+# JWT Configuration with secure defaults
+_jwt_secret_cache = None
+_jwt_secret_last_refresh = None
+JWT_SECRET_REFRESH_INTERVAL = 3600  # Refresh secret from manager every hour
+
+async def get_jwt_secret() -> str:
+    """Get JWT secret with caching and fallback."""
+    global _jwt_secret_cache, _jwt_secret_last_refresh
+    
+    # Check if we need to refresh the secret
+    now = time.time()
+    if (_jwt_secret_cache is None or 
+        _jwt_secret_last_refresh is None or
+        now - _jwt_secret_last_refresh > JWT_SECRET_REFRESH_INTERVAL):
+        
+        # Try to get from secrets manager
+        if secrets_manager:
+            secret = await get_secret("JWT_SECRET", required=False)
+            if secret:
+                _jwt_secret_cache = secret
+                _jwt_secret_last_refresh = now
+                return secret
+        
+        # Fallback to environment variable
+        secret = os.getenv("JWT_SECRET")
+        if secret:
+            _jwt_secret_cache = secret
+            _jwt_secret_last_refresh = now
+            return secret
+        
+        # Generate a secure default (only for development)
+        if os.getenv("ENVIRONMENT", "production").lower() in ["development", "test"]:
+            logger.warning("JWT_SECRET not configured, generating a random secret for development")
+            secret = secrets.token_urlsafe(32)
+            os.environ["JWT_SECRET"] = secret
+            _jwt_secret_cache = secret
+            _jwt_secret_last_refresh = now
+            return secret
+        
+        # Production requires explicit configuration
+        raise ValueError("JWT_SECRET must be configured in production environment")
+    
+    return _jwt_secret_cache
+
+# Synchronous wrapper for backward compatibility
+def get_jwt_secret_sync() -> str:
+    """Synchronous wrapper for get_jwt_secret."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If we're already in an async context, we can't use run_until_complete
+            # Return cached value or raise error
+            if _jwt_secret_cache:
+                return _jwt_secret_cache
+            else:
+                # Try environment variable as last resort
+                secret = os.getenv("JWT_SECRET")
+                if secret:
+                    return secret
+                raise ValueError("JWT_SECRET not available in cache")
+        else:
+            return loop.run_until_complete(get_jwt_secret())
+    except RuntimeError:
+        # No event loop, create one
+        return asyncio.run(get_jwt_secret())
 
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
@@ -55,12 +130,14 @@ class JWTHandler:
         to_encode.update({
             "exp": expire,
             "iat": datetime.utcnow(),
-            "type": "access"
+            "type": "access",
+            "jti": secrets.token_urlsafe(16)  # JWT ID for revocation support
         })
         
-        # Generar token
+        # Generar token con secret seguro
         try:
-            encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+            jwt_secret = get_jwt_secret_sync()
+            encoded_jwt = jwt.encode(to_encode, jwt_secret, algorithm=JWT_ALGORITHM)
             return encoded_jwt
         except Exception as e:
             logger.error(f"Error al generar token JWT: {str(e)}")
@@ -90,12 +167,14 @@ class JWTHandler:
         to_encode.update({
             "exp": expire,
             "iat": datetime.utcnow(),
-            "type": "refresh"
+            "type": "refresh",
+            "jti": secrets.token_urlsafe(16)  # JWT ID for revocation support
         })
         
-        # Generar token
+        # Generar token con secret seguro
         try:
-            encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+            jwt_secret = get_jwt_secret_sync()
+            encoded_jwt = jwt.encode(to_encode, jwt_secret, algorithm=JWT_ALGORITHM)
             return encoded_jwt
         except Exception as e:
             logger.error(f"Error al generar token de actualización JWT: {str(e)}")
@@ -116,7 +195,8 @@ class JWTHandler:
             jwt.PyJWTError: Si el token es inválido o ha expirado
         """
         try:
-            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            jwt_secret = get_jwt_secret_sync()
+            payload = jwt.decode(token, jwt_secret, algorithms=[JWT_ALGORITHM])
             return payload
         except jwt.ExpiredSignatureError:
             logger.warning("Token JWT expirado")

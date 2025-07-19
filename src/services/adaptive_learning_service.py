@@ -35,7 +35,7 @@ from src.models.learning_models import (
 
 # Importar servicios relacionados
 from src.services.conversation_outcome_tracker import ConversationOutcomeTracker
-from src.integrations.supabase import supabase_client
+from src.integrations.supabase.client import supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -59,14 +59,16 @@ class AdaptiveLearningService:
         self.pattern_cache = {}  # Cache de patrones identificados
         self.learning_history = []  # Historial de aprendizajes
         
-        # Inicializar modelos base
-        asyncio.create_task(self._initialize_base_models())
+        # Flags para inicialización lazy
+        self._initialized = False
+        self._initializing = False
         
     def _load_configuration(self) -> AdaptiveLearningConfig:
         """Carga configuración del sistema de aprendizaje."""
         try:
             # Intentar cargar de base de datos
-            result = supabase_client.table("adaptive_learning_config")\
+            client = supabase_client.get_client()
+            result = client.table("adaptive_learning_config")\
                 .select("*")\
                 .eq("is_active", True)\
                 .execute()
@@ -79,21 +81,80 @@ class AdaptiveLearningService:
                     auto_deploy_threshold=config_data.get("auto_deploy_threshold", 0.95),
                     learning_rate=config_data.get("learning_rate", 0.01),
                     pattern_detection_sensitivity=config_data.get("pattern_detection_sensitivity", 0.05),
-                    minimum_pattern_sample_size=config_data.get("minimum_pattern_sample_size", 50)
+                    minimum_pattern_sample_size=config_data.get("minimum_pattern_sample_size", 50),
+                    model_retraining_frequency_hours=config_data.get("model_retraining_frequency_hours", 24),
+                    performance_degradation_threshold=config_data.get("performance_degradation_threshold", 0.05),
+                    champion_challenger_ratio=config_data.get("champion_challenger_ratio", 0.9),
+                    fallback_to_baseline_on_error=config_data.get("fallback_to_baseline_on_error", True),
+                    max_performance_degradation_allowed=config_data.get("max_performance_degradation_allowed", 0.1),
+                    automatic_rollback_enabled=config_data.get("automatic_rollback_enabled", True)
                 )
             else:
                 logger.warning("No active configuration found, using defaults")
-                return AdaptiveLearningConfig()
+                # Provide all required arguments with default values
+                return AdaptiveLearningConfig(
+                    max_concurrent_experiments=5,
+                    minimum_experiment_duration_hours=24,
+                    auto_deploy_threshold=0.95,
+                    learning_rate=0.01,
+                    pattern_detection_sensitivity=0.05,
+                    minimum_pattern_sample_size=50,
+                    model_retraining_frequency_hours=24,
+                    performance_degradation_threshold=0.05,
+                    champion_challenger_ratio=0.9,
+                    fallback_to_baseline_on_error=True,
+                    max_performance_degradation_allowed=0.1,
+                    automatic_rollback_enabled=True
+                )
                 
         except Exception as e:
             logger.error(f"Error loading configuration: {str(e)}")
-            return AdaptiveLearningConfig()
+            # Provide all required arguments with default values
+            return AdaptiveLearningConfig(
+                max_concurrent_experiments=5,
+                minimum_experiment_duration_hours=24,
+                auto_deploy_threshold=0.95,
+                learning_rate=0.01,
+                pattern_detection_sensitivity=0.05,
+                minimum_pattern_sample_size=50,
+                model_retraining_frequency_hours=24,
+                performance_degradation_threshold=0.05,
+                champion_challenger_ratio=0.9,
+                fallback_to_baseline_on_error=True,
+                max_performance_degradation_allowed=0.1,
+                automatic_rollback_enabled=True
+            )
+    
+    async def initialize(self) -> None:
+        """
+        Inicializa el servicio de forma asíncrona.
+        Este método debe ser llamado después de crear la instancia.
+        """
+        if self._initialized or self._initializing:
+            return
+            
+        self._initializing = True
+        try:
+            await self._initialize_base_models()
+            self._initialized = True
+            logger.info("AdaptiveLearningService inicializado correctamente")
+        except Exception as e:
+            logger.error(f"Error inicializando AdaptiveLearningService: {e}")
+            raise
+        finally:
+            self._initializing = False
+    
+    async def _ensure_initialized(self) -> None:
+        """Asegura que el servicio esté inicializado antes de usarlo."""
+        if not self._initialized:
+            await self.initialize()
     
     async def _initialize_base_models(self) -> None:
         """Inicializa modelos base del sistema."""
         try:
             # Cargar modelos existentes de la base de datos
-            result = supabase_client.table("learned_models")\
+            client = supabase_client.get_client()
+            result = client.table("learned_models")\
                 .select("*")\
                 .eq("champion_model", True)\
                 .execute()
@@ -167,12 +228,14 @@ class AdaptiveLearningService:
         Returns:
             Lista de patrones identificados
         """
+        await self._ensure_initialized()
         try:
             min_sample = minimum_sample_size or self.config.minimum_pattern_sample_size
             cutoff_date = datetime.now() - timedelta(days=lookback_days)
             
             # Obtener datos de conversaciones recientes
-            result = supabase_client.table("conversation_outcomes")\
+            client = supabase_client.get_client()
+            result = client.table("conversation_outcomes")\
                 .select("*")\
                 .gte("recorded_at", cutoff_date.isoformat())\
                 .execute()
@@ -464,11 +527,13 @@ class AdaptiveLearningService:
         Returns:
             Modelo entrenado o None si falla
         """
+        await self._ensure_initialized()
         try:
             cutoff_date = datetime.now() - timedelta(days=lookback_days)
             
             # Obtener datos de entrenamiento
-            result = supabase_client.table("conversation_outcomes")\
+            client = supabase_client.get_client()
+            result = client.table("conversation_outcomes")\
                 .select("*")\
                 .gte("recorded_at", cutoff_date.isoformat())\
                 .execute()
@@ -586,7 +651,8 @@ class AdaptiveLearningService:
                 "validation_frequency_days": pattern.validation_frequency_days
             }
             
-            result = supabase_client.table("identified_patterns").insert(pattern_data).execute()
+            client = supabase_client.get_client()
+            result = client.table("identified_patterns").insert(pattern_data).execute()
             
             if hasattr(result, 'error') and result.error:
                 logger.error(f"Database error saving pattern: {result.error}")
@@ -617,7 +683,8 @@ class AdaptiveLearningService:
                 "created_by": model.created_by
             }
             
-            result = supabase_client.table("learned_models").insert(model_data).execute()
+            client = supabase_client.get_client()
+            result = client.table("learned_models").insert(model_data).execute()
             
             if hasattr(result, 'error') and result.error:
                 logger.error(f"Database error saving model: {result.error}")
@@ -640,6 +707,7 @@ class AdaptiveLearningService:
         Returns:
             Tupla (probabilidad, explicación)
         """
+        await self._ensure_initialized()
         try:
             model_info = self.active_models.get(ModelType.CONVERSION_PREDICTION.value)
             
@@ -746,6 +814,7 @@ class AdaptiveLearningService:
         Returns:
             Lista de recomendaciones de estrategia
         """
+        await self._ensure_initialized()
         try:
             recommendations = []
             
@@ -757,7 +826,8 @@ class AdaptiveLearningService:
             
             # Si no hay patrones en cache, cargar de base de datos
             if not relevant_patterns:
-                result = supabase_client.table("identified_patterns")\
+                client = supabase_client.get_client()
+                result = client.table("identified_patterns")\
                     .select("*")\
                     .contains("applicable_archetypes", [client_archetype])\
                     .or_("applicable_archetypes.cs.{\"all\"}")\
@@ -826,6 +896,7 @@ class AdaptiveLearningService:
     
     async def run_continuous_learning_cycle(self) -> None:
         """Ejecuta ciclo continuo de aprendizaje del sistema."""
+        await self._ensure_initialized()
         try:
             logger.info("Starting continuous learning cycle")
             

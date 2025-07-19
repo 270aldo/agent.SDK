@@ -113,6 +113,9 @@ class ConversationService:
         # Cache para experimentos activos
         self.active_experiments = {}
         
+        # Flag para indicar si el servicio está completamente inicializado
+        self._initialized = False
+        
         logger.info("Sistema ML adaptativo inicializado - Agente listo para evolucionar")
         
         # Instancia de agente actual
@@ -121,6 +124,29 @@ class ConversationService:
         # Verificar adaptadores disponibles
         available_adapters = agent_factory.get_available_adapters()
         logger.info(f"Adaptadores de agente disponibles: {available_adapters}")
+    
+    async def initialize(self) -> None:
+        """
+        Inicializa todos los servicios asíncronos.
+        Debe llamarse antes de usar el servicio.
+        """
+        if self._initialized:
+            return
+            
+        try:
+            # Inicializar servicios ML
+            await self.adaptive_learning_service.initialize()
+            
+            self._initialized = True
+            logger.info("ConversationService completamente inicializado")
+        except Exception as e:
+            logger.error(f"Error inicializando ConversationService: {e}")
+            raise
+    
+    async def _ensure_initialized(self) -> None:
+        """Asegura que el servicio esté inicializado antes de usarlo."""
+        if not self._initialized:
+            await self.initialize()
     
     async def start_conversation(
         self, 

@@ -1,0 +1,107 @@
+version: 2
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "270aldo"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      python-dev:
+        patterns:
+          - "pytest*"
+          - "ruff*"
+          - "mypy*"
+          - "black*"
+      python-core:
+        patterns:
+          - "fastapi*"
+          - "pydantic*"
+          - "supabase*"
+          - "openai*"
+
+  # JavaScript dependencies - Root
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "270aldo"
+    labels:
+      - "dependencies"
+      - "javascript"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # JavaScript dependencies - SDK
+  - package-ecosystem: "npm"
+    directory: "/sdk"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "270aldo"
+    labels:
+      - "dependencies"
+      - "sdk"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      sdk-build:
+        patterns:
+          - "typescript*"
+          - "tsup*"
+          - "eslint*"
+      sdk-test:
+        patterns:
+          - "jest*"
+          - "@testing-library/*"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    reviewers:
+      - "270aldo"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+  # Docker
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    reviewers:
+      - "270aldo"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "build"
+      include: "scope"

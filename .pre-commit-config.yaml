@@ -1,97 +1,136 @@
-# Pre-commit hooks configuration
-# Install with: pre-commit install
-# Run manually: pre-commit run --all-files
+# Pre-commit hooks for code quality and consistency
+# Install: pip install pre-commit && pre-commit install
 
 repos:
-  # General hooks
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-yaml
-      - id: check-added-large-files
-        args: ['--maxkb=1000']
-      - id: check-json
-      - id: check-toml
-      - id: check-merge-conflict
-      - id: debug-statements
-      - id: mixed-line-ending
-      - id: name-tests-test
-        args: ['--pytest-test-first']
-      - id: requirements-txt-fixer
-
-  # Python code formatting - Black
+  # Python code formatting
   - repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 23.12.1
     hooks:
       - id: black
-        language_version: python3.10
+        language_version: python3.11
         args: ['--line-length=88']
 
-  # Import sorting - isort
-  - repo: https://github.com/pycqa/isort
+  # Import sorting
+  - repo: https://github.com/PyCQA/isort
     rev: 5.13.2
     hooks:
       - id: isort
         args: ['--profile=black', '--line-length=88']
 
-  # Linting - Flake8
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.1.1
+  # Linting
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.0.0
     hooks:
       - id: flake8
         args: [
           '--max-line-length=88',
-          '--extend-ignore=E203,W503',
-          '--max-complexity=10',
+          '--extend-ignore=E203,W503,E501',
+          '--max-complexity=10'
         ]
-        additional_dependencies:
-          - flake8-docstrings
-          - flake8-bugbear
-          - flake8-comprehensions
-          - flake8-simplify
+        additional_dependencies: [
+          'flake8-docstrings',
+          'flake8-typing-imports',
+          'flake8-annotations',
+          'flake8-bugbear'
+        ]
 
-  # Type checking - MyPy
+  # Type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
+    rev: v1.8.0
     hooks:
       - id: mypy
         args: [
           '--ignore-missing-imports',
+          '--strict',
           '--warn-redundant-casts',
-          '--warn-unused-ignores',
-          '--no-implicit-reexport',
+          '--warn-unused-ignores'
         ]
-        additional_dependencies:
-          - types-requests
-          - types-pyyaml
-          - pydantic
+        additional_dependencies: [
+          'types-requests',
+          'types-PyYAML',
+          'types-redis',
+          'pydantic'
+        ]
 
   # Security checks
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.0
+    rev: 1.7.6
     hooks:
       - id: bandit
-        args: ['-c', 'pyproject.toml']
-        additional_dependencies: ['bandit[toml]']
+        args: ['-r', 'src/', '-ll']
+        exclude: 'tests/'
 
-  # Docstring coverage
-  - repo: https://github.com/pycqa/pydocstyle
-    rev: 6.3.0
+  # YAML formatting
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
     hooks:
-      - id: pydocstyle
-        args: ['--convention=google']
+      - id: prettier
+        types_or: [yaml, markdown, json]
+        exclude: '^docs/api/openapi/'
 
-# Configuration
-ci:
-  autofix_commit_msg: |
-    [pre-commit.ci] auto fixes from pre-commit.com hooks
+  # Remove trailing whitespace
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        exclude: '^docs/api/openapi/'
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: debug-statements
+      - id: mixed-line-ending
+        args: ['--fix=lf']
 
-    for more information, see https://pre-commit.ci
-  autofix_prs: true
-  autoupdate_branch: ''
-  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
-  autoupdate_schedule: weekly
-  skip: []
-  submodules: false
+  # Secrets detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        args: ['--config', '.markdownlint.json']
+
+  # SQL formatting
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 3.0.0a5
+    hooks:
+      - id: sqlfluff-lint
+        files: '\.(sql|sql\.j2)$'
+        args: ['--dialect', 'postgres']
+
+  # Commit message linting
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.13.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+# Global exclude patterns
+exclude: |
+  (?x)(
+    ^\.venv/|
+    ^venv/|
+    ^\.env|
+    ^migrations/|
+    ^static/|
+    ^media/|
+    ^\.pytest_cache/|
+    ^\.mypy_cache/|
+    ^\.coverage|
+    ^htmlcov/|
+    ^node_modules/|
+    ^build/|
+    ^dist/
+  )
+
+# CI mode - fail fast
+fail_fast: false

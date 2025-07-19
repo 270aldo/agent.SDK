@@ -1,0 +1,238 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: ngx-voice-agent
+  EKS_CLUSTER_NAME: ngx-cluster
+
+jobs:
+  # Deploy to staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://staging-api.ngx.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: staging-${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f docker/Dockerfile .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:staging-latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:staging-latest
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy to Kubernetes
+        env:
+          IMAGE_TAG: staging-${{ github.sha }}
+        run: |
+          kubectl set image deployment/voice-agent-api \
+            voice-agent-api=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG \
+            -n staging
+          kubectl rollout status deployment/voice-agent-api -n staging
+
+      - name: Run smoke tests
+        run: |
+          ./scripts/smoke-tests.sh https://staging-api.ngx.com
+
+      - name: Notify deployment
+        uses: 8398a7/action-slack@v3
+        if: always()
+        with:
+          status: ${{ job.status }}
+          text: |
+            Staging deployment ${{ job.status }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  # Deploy to production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.environment == 'production'
+    needs: [deploy-staging]
+    environment:
+      name: production
+      url: https://api.ngx.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Promote staging image to production
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.ref_name }}
+        run: |
+          # Pull staging image
+          docker pull $ECR_REGISTRY/$ECR_REPOSITORY:staging-latest
+          
+          # Tag for production
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:staging-latest $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:staging-latest $ECR_REGISTRY/$ECR_REPOSITORY:production-latest
+          
+          # Push production tags
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:production-latest
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }}-prod --region ${{ env.AWS_REGION }}
+
+      - name: Blue-Green Deployment
+        env:
+          IMAGE_TAG: ${{ github.ref_name }}
+        run: |
+          # Deploy to green environment
+          kubectl set image deployment/voice-agent-api-green \
+            voice-agent-api=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG \
+            -n production
+          
+          # Wait for green deployment to be ready
+          kubectl rollout status deployment/voice-agent-api-green -n production
+          
+          # Run health checks on green
+          ./scripts/health-check.sh https://green.api.ngx.com
+          
+          # Switch traffic to green
+          kubectl patch service voice-agent-api -n production -p '{"spec":{"selector":{"version":"green"}}}'
+          
+          # Update blue with new image for next deployment
+          kubectl set image deployment/voice-agent-api-blue \
+            voice-agent-api=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG \
+            -n production
+
+      - name: Run production tests
+        run: |
+          ./scripts/production-tests.sh https://api.ngx.com
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            CHANGELOG.md
+            docs/release-notes-${{ github.ref_name }}.md
+
+      - name: Update deployment tracking
+        run: |
+          curl -X POST https://api.ngx.com/deployments \
+            -H "Authorization: Bearer ${{ secrets.DEPLOYMENT_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "version": "${{ github.ref_name }}",
+              "environment": "production",
+              "commit": "${{ github.sha }}",
+              "deployed_by": "${{ github.actor }}",
+              "deployed_at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"
+            }'
+
+      - name: Notify deployment
+        uses: 8398a7/action-slack@v3
+        if: always()
+        with:
+          status: ${{ job.status }}
+          text: |
+            🚀 Production deployment ${{ job.status }}
+            Version: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Deployed by: ${{ github.actor }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_PROD }}
+
+  # Rollback production if needed
+  rollback-production:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    if: failure() && needs.deploy-production.result == 'failure'
+    needs: [deploy-production]
+    environment:
+      name: production
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }}-prod --region ${{ env.AWS_REGION }}
+
+      - name: Rollback to blue
+        run: |
+          # Switch traffic back to blue
+          kubectl patch service voice-agent-api -n production -p '{"spec":{"selector":{"version":"blue"}}}'
+          
+          echo "⚠️ Rolled back to previous version (blue deployment)"
+
+      - name: Notify rollback
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "🔄 Production deployment rolled back",
+              attachments: [{
+                color: 'warning',
+                fields: [
+                  { title: 'Version', value: '${{ github.ref_name }}', short: true },
+                  { title: 'Reason', value: 'Deployment failed', short: true }
+                ]
+              }]
+            }
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_PROD }}
