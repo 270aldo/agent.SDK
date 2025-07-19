@@ -51,7 +51,15 @@ class ObjectionPredictionService(BasePredictiveService):
             model_name="objection_prediction_model",
             model_type="objection"
         )
-        self._initialize_model()
+        self._initialized = False
+    
+    async def initialize(self) -> None:
+        """
+        Inicializa el servicio de forma asíncrona.
+        """
+        if not self._initialized:
+            await self._initialize_model()
+            self._initialized = True
         
     async def _initialize_model(self) -> None:
         """
@@ -94,6 +102,7 @@ class ObjectionPredictionService(BasePredictiveService):
             Predicciones de objeciones con niveles de confianza
         """
         try:
+            await self.initialize()
             if not messages:
                 return {"objections": [], "confidence": 0, "signals": {}}
             

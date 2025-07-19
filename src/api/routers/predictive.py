@@ -68,39 +68,74 @@ router = APIRouter(
     },
 )
 
-# Instanciar servicios
-supabase_client = ResilientSupabaseClient()
-predictive_model_service = PredictiveModelService(supabase_client)
-nlp_integration_service = NLPIntegrationService()
-entity_recognition_service = EntityRecognitionService()
+# Variables globales para servicios (lazy initialization)
+_services_initialized = False
+supabase_client = None
+predictive_model_service = None
+nlp_integration_service = None
+entity_recognition_service = None
+objection_prediction_service = None
+needs_prediction_service = None
+conversion_prediction_service = None
+decision_engine_service = None
 
-objection_prediction_service = ObjectionPredictionService(
-    supabase_client,
-    predictive_model_service,
-    nlp_integration_service
-)
-
-needs_prediction_service = NeedsPredictionService(
-    supabase_client,
-    predictive_model_service,
-    nlp_integration_service,
-    entity_recognition_service
-)
-
-conversion_prediction_service = ConversionPredictionService(
-    supabase_client,
-    predictive_model_service,
-    nlp_integration_service
-)
-
-decision_engine_service = DecisionEngineService(
-    supabase_client,
-    predictive_model_service,
-    nlp_integration_service,
-    objection_prediction_service,
-    needs_prediction_service,
-    conversion_prediction_service
-)
+async def get_services():
+    """
+    Obtiene o inicializa los servicios de forma lazy.
+    """
+    global _services_initialized, supabase_client, predictive_model_service
+    global nlp_integration_service, entity_recognition_service
+    global objection_prediction_service, needs_prediction_service
+    global conversion_prediction_service, decision_engine_service
+    
+    if not _services_initialized:
+        # Instanciar servicios base
+        supabase_client = ResilientSupabaseClient()
+        predictive_model_service = PredictiveModelService(supabase_client)
+        nlp_integration_service = NLPIntegrationService()
+        entity_recognition_service = EntityRecognitionService()
+        
+        # Instanciar servicios predictivos
+        objection_prediction_service = ObjectionPredictionService(
+            supabase_client,
+            predictive_model_service,
+            nlp_integration_service
+        )
+        await objection_prediction_service.initialize()
+        
+        needs_prediction_service = NeedsPredictionService(
+            supabase_client,
+            predictive_model_service,
+            nlp_integration_service,
+            entity_recognition_service
+        )
+        await needs_prediction_service.initialize()
+        
+        conversion_prediction_service = ConversionPredictionService(
+            supabase_client,
+            predictive_model_service,
+            nlp_integration_service
+        )
+        await conversion_prediction_service.initialize()
+        
+        decision_engine_service = DecisionEngineService(
+            supabase_client,
+            predictive_model_service,
+            nlp_integration_service,
+            objection_prediction_service,
+            needs_prediction_service,
+            conversion_prediction_service
+        )
+        await decision_engine_service.initialize()
+        
+        _services_initialized = True
+    
+    return {
+        "objection": objection_prediction_service,
+        "needs": needs_prediction_service,
+        "conversion": conversion_prediction_service,
+        "decision": decision_engine_service
+    }
 
 # Rutas para predicción de objeciones
 @router.post("/objection/predict")
@@ -120,10 +155,11 @@ async def predict_objections(
         Dict: Predicciones de objeciones con niveles de confianza
     """
     try:
-        prediction = await objection_prediction_service.predict_objections(
+        services = await get_services()
+        prediction = await services["objection"].predict_objections(
             conversation_id=request.conversation_id,
-            messages=[message.dict() for message in request.messages],
-            customer_profile=request.customer_profile.dict() if request.customer_profile else None
+            messages=[message.model_dump() for message in request.messages],
+            customer_profile=request.customer_profile.model_dump() if request.customer_profile else None
         )
         
         return {
@@ -161,7 +197,8 @@ async def record_objection(
         Dict: Resultado del registro
     """
     try:
-        result = await objection_prediction_service.record_objection(
+        services = await get_services()
+        result = await services["objection"].record_objection(
             conversation_id=objection.conversation_id,
             objection_type=objection.objection_type,
             objection_text=objection.objection_text
@@ -203,10 +240,11 @@ async def predict_needs(
         Dict: Predicciones de necesidades con niveles de confianza
     """
     try:
-        prediction = await needs_prediction_service.predict_needs(
+        services = await get_services()
+        prediction = await services["needs"].predict_needs(
             conversation_id=request.conversation_id,
-            messages=[message.dict() for message in request.messages],
-            customer_profile=request.customer_profile.dict() if request.customer_profile else None
+            messages=[message.model_dump() for message in request.messages],
+            customer_profile=request.customer_profile.model_dump() if request.customer_profile else None
         )
         
         return {
@@ -244,7 +282,8 @@ async def record_need(
         Dict: Resultado del registro
     """
     try:
-        result = await needs_prediction_service.record_need(
+        services = await get_services()
+        result = await services["needs"].record_need(
             conversation_id=need.conversation_id,
             need_category=need.need_category,
             need_description=need.need_description
@@ -286,10 +325,11 @@ async def predict_conversion(
         Dict: Predicción de probabilidad de conversión con recomendaciones
     """
     try:
-        prediction = await conversion_prediction_service.predict_conversion(
+        services = await get_services()
+        prediction = await services["conversion"].predict_conversion(
             conversation_id=request.conversation_id,
-            messages=[message.dict() for message in request.messages],
-            customer_profile=request.customer_profile.dict() if request.customer_profile else None,
+            messages=[message.model_dump() for message in request.messages],
+            customer_profile=request.customer_profile.model_dump() if request.customer_profile else None,
             product_id=request.product_id
         )
         
@@ -328,7 +368,8 @@ async def record_conversion(
         Dict: Resultado del registro
     """
     try:
-        result = await conversion_prediction_service.record_conversion(
+        services = await get_services()
+        result = await services["conversion"].record_conversion(
             conversation_id=conversion.conversation_id,
             did_convert=conversion.did_convert,
             conversion_details=conversion.conversion_details
@@ -371,10 +412,11 @@ async def optimize_conversation_flow(
         Dict: Recomendaciones de flujo optimizado
     """
     try:
-        optimized_flow = await decision_engine_service.optimize_conversation_flow(
+        services = await get_services()
+        optimized_flow = await services["decision"].optimize_conversation_flow(
             conversation_id=request.conversation_id,
-            messages=[message.dict() for message in request.messages],
-            customer_profile=request.customer_profile.dict() if request.customer_profile else None,
+            messages=[message.model_dump() for message in request.messages],
+            customer_profile=request.customer_profile.model_dump() if request.customer_profile else None,
             current_objectives=request.current_objectives
         )
         
@@ -415,12 +457,13 @@ async def adapt_strategy(
         Dict: Estrategia adaptada con nuevas acciones recomendadas
     """
     try:
-        adapted_strategy = await decision_engine_service.adapt_strategy(
+        services = await get_services()
+        adapted_strategy = await services["decision"].adapt_strategy(
             conversation_id=request.conversation_id,
-            messages=[message.dict() for message in request.messages],
+            messages=[message.model_dump() for message in request.messages],
             current_strategy=request.current_strategy,
             feedback=request.feedback,
-            customer_profile=request.customer_profile.dict() if request.customer_profile else None
+            customer_profile=request.customer_profile.model_dump() if request.customer_profile else None
         )
         
         return {

@@ -56,7 +56,15 @@ class NeedsPredictionService(BasePredictiveService):
             model_type="needs"
         )
         self.entity_service = entity_recognition_service
-        self._initialize_model()
+        self._initialized = False
+    
+    async def initialize(self) -> None:
+        """
+        Inicializa el servicio de forma asíncrona.
+        """
+        if not self._initialized:
+            await self._initialize_model()
+            self._initialized = True
         
     async def _initialize_model(self) -> None:
         """
@@ -99,6 +107,7 @@ class NeedsPredictionService(BasePredictiveService):
             Predicciones de necesidades con niveles de confianza
         """
         try:
+            await self.initialize()
             if not messages:
                 return {"needs": [], "confidence": 0, "features": {}}
             

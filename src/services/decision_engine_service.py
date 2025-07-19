@@ -63,7 +63,15 @@ class DecisionEngineService(BasePredictiveService):
         self.objection_service = objection_prediction_service
         self.needs_service = needs_prediction_service
         self.conversion_service = conversion_prediction_service
-        self._initialize_model()
+        self._initialized = False
+    
+    async def initialize(self) -> None:
+        """
+        Inicializa el servicio de forma asíncrona.
+        """
+        if not self._initialized:
+            await self._initialize_model()
+            self._initialized = True
         
     async def _initialize_model(self) -> None:
         """
@@ -104,6 +112,7 @@ class DecisionEngineService(BasePredictiveService):
             Estrategia optimizada con acciones recomendadas
         """
         try:
+            await self.initialize()
             if not messages:
                 return {
                     "next_actions": [],

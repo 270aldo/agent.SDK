@@ -52,7 +52,15 @@ class ConversionPredictionService(BasePredictiveService):
             model_name="conversion_prediction_model",
             model_type="conversion"
         )
-        self._initialize_model()
+        self._initialized = False
+    
+    async def initialize(self) -> None:
+        """
+        Inicializa el servicio de forma asíncrona.
+        """
+        if not self._initialized:
+            await self._initialize_model()
+            self._initialized = True
         
     async def _initialize_model(self) -> None:
         """
@@ -96,6 +104,7 @@ class ConversionPredictionService(BasePredictiveService):
             Predicción de probabilidad de conversión con recomendaciones
         """
         try:
+            await self.initialize()
             if not messages:
                 return {
                     "probability": 0, 
