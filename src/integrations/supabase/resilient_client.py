@@ -447,6 +447,19 @@ class ResilientSupabaseClient:
         else:
             return {"data": result}
     
+    def table(self, table_name: str):
+        """
+        Obtener un objeto de tabla para operaciones encadenadas.
+        Provee compatibilidad con el patrón client.table().select().execute()
+        
+        Args:
+            table_name: Nombre de la tabla
+            
+        Returns:
+            TableQueryBuilder: Constructor de consultas para la tabla
+        """
+        return TableQueryBuilder(self, table_name)
+    
     async def check_connection(self, max_retries: int = 3) -> bool:
         """
         Verificar la conexión a Supabase con reintentos automáticos.
@@ -473,6 +486,107 @@ class ResilientSupabaseClient:
         except Exception as e:
             logger.error(f"Error al verificar la conexión a Supabase (cliente resiliente): {e}")
             return False
+
+class TableQueryBuilder:
+    """
+    Constructor de consultas para compatibilidad con el patrón table().select().execute()
+    """
+    
+    def __init__(self, client: ResilientSupabaseClient, table_name: str):
+        self.client = client
+        self.table_name = table_name
+        self._query_type = None
+        self._query_data = None
+        self._columns = "*"
+        self._filters = {}
+        self._limit_value = None
+        self._order_by_field = None
+        self._order_desc = False
+        
+    def select(self, columns: str = "*"):
+        """Configurar consulta SELECT"""
+        self._query_type = "select"
+        self._columns = columns
+        return self
+        
+    def insert(self, data: Union[Dict[str, Any], List[Dict[str, Any]]]):
+        """Configurar consulta INSERT"""
+        self._query_type = "insert"
+        self._query_data = data
+        return self
+        
+    def update(self, data: Dict[str, Any]):
+        """Configurar consulta UPDATE"""
+        self._query_type = "update"
+        self._query_data = data
+        return self
+        
+    def upsert(self, data: Union[Dict[str, Any], List[Dict[str, Any]]]):
+        """Configurar consulta UPSERT"""
+        self._query_type = "upsert"
+        self._query_data = data
+        return self
+        
+    def delete(self):
+        """Configurar consulta DELETE"""
+        self._query_type = "delete"
+        return self
+        
+    def eq(self, column: str, value: Any):
+        """Agregar filtro de igualdad"""
+        self._filters[column] = value
+        return self
+        
+    def limit(self, count: int):
+        """Limitar número de resultados"""
+        self._limit_value = count
+        return self
+        
+    def order(self, column: str, desc: bool = False):
+        """Ordenar resultados"""
+        self._order_by_field = column
+        self._order_desc = desc
+        return self
+    
+    async def execute(self):
+        """Ejecutar la consulta construida"""
+        if self._query_type == "select":
+            result = await self.client.select(
+                table=self.table_name,
+                columns=self._columns,
+                filters=self._filters if self._filters else None,
+                limit=self._limit_value,
+                order_by=self._order_by_field,
+                order_direction="desc" if self._order_desc else "asc"
+            )
+            return {"data": result}
+            
+        elif self._query_type == "insert":
+            return await self.client.insert(
+                table=self.table_name,
+                data=self._query_data
+            )
+            
+        elif self._query_type == "update":
+            return await self.client.update(
+                table=self.table_name,
+                data=self._query_data,
+                filters=self._filters
+            )
+            
+        elif self._query_type == "upsert":
+            return await self.client.upsert(
+                table=self.table_name,
+                data=self._query_data
+            )
+            
+        elif self._query_type == "delete":
+            return await self.client.delete(
+                table=self.table_name,
+                filters=self._filters
+            )
+        else:
+            raise ValueError(f"Tipo de consulta no válido: {self._query_type}")
 
 # Instancia singleton del cliente resiliente
 resilient_supabase_client = ResilientSupabaseClient()

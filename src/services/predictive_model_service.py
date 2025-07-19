@@ -87,10 +87,11 @@ class PredictiveModelService:
                 "training_samples": 0
             }
             
-            result = self.supabase.table("predictive_models").insert(model_data).execute()
+            result = await self.supabase.table("predictive_models").insert(model_data).execute()
             logger.info(f"Modelo predictivo registrado: {model_name}")
             
-            return result.data[0] if result.data else {}
+            result_data = result.get("data", []) if isinstance(result, dict) else result.data
+            return result_data[0] if result_data else {}
             
         except Exception as e:
             logger.error(f"Error al registrar modelo predictivo: {e}")
@@ -107,8 +108,9 @@ class PredictiveModelService:
             Información del modelo
         """
         try:
-            result = self.supabase.table("predictive_models").select("*").eq("name", model_name).execute()
-            return result.data[0] if result.data else {}
+            result = await self.supabase.table("predictive_models").select("*").eq("name", model_name).execute()
+            result_data = result.get("data", []) if isinstance(result, dict) else result.data
+            return result_data[0] if result_data else {}
             
         except Exception as e:
             logger.error(f"Error al obtener modelo predictivo: {e}")
@@ -130,8 +132,9 @@ class PredictiveModelService:
             if model_type:
                 query = query.eq("type", model_type)
                 
-            result = query.execute()
-            return result.data if result.data else []
+            result = await query.execute()
+            result_data = result.get("data", []) if isinstance(result, dict) else result.data
+            return result_data if result_data else []
             
         except Exception as e:
             logger.error(f"Error al listar modelos predictivos: {e}")
@@ -165,10 +168,11 @@ class PredictiveModelService:
             if accuracy is not None:
                 update_data["accuracy"] = accuracy
             
-            result = self.supabase.table("predictive_models").update(update_data).eq("name", model_name).execute()
+            result = await self.supabase.table("predictive_models").update(update_data).eq("name", model_name).execute()
             logger.info(f"Modelo predictivo actualizado: {model_name}")
             
-            return result.data[0] if result.data else {}
+            result_data = result.get("data", []) if isinstance(result, dict) else result.data
+            return result_data[0] if result_data else {}
             
         except Exception as e:
             logger.error(f"Error al actualizar modelo predictivo: {e}")
@@ -185,10 +189,11 @@ class PredictiveModelService:
             True si se eliminó correctamente, False en caso contrario
         """
         try:
-            result = self.supabase.table("predictive_models").delete().eq("name", model_name).execute()
+            result = await self.supabase.table("predictive_models").delete().eq("name", model_name).execute()
             logger.info(f"Modelo predictivo eliminado: {model_name}")
             
-            return len(result.data) > 0
+            result_data = result.get("data", []) if isinstance(result, dict) else result.data
+            return len(result_data) > 0
             
         except Exception as e:
             logger.error(f"Error al eliminar modelo predictivo: {e}")
@@ -222,10 +227,11 @@ class PredictiveModelService:
                 "result": None
             }
             
-            result = self.supabase.table("prediction_results").insert(prediction).execute()
+            result = await self.supabase.table("prediction_results").insert(prediction).execute()
             logger.info(f"Predicción almacenada para conversación: {conversation_id}")
             
-            return result.data[0] if result.data else {}
+            result_data = result.get("data", []) if isinstance(result, dict) else result.data
+            return result_data[0] if result_data else {}
             
         except Exception as e:
             logger.error(f"Error al almacenar predicción: {e}")
@@ -253,10 +259,11 @@ class PredictiveModelService:
                 "completed_at": datetime.now().isoformat()
             }
             
-            result = self.supabase.table("prediction_results").update(update_data).eq("id", prediction_id).execute()
+            result = await self.supabase.table("prediction_results").update(update_data).eq("id", prediction_id).execute()
             logger.info(f"Resultado de predicción actualizado: {prediction_id}")
             
-            return result.data[0] if result.data else {}
+            result_data = result.get("data", []) if isinstance(result, dict) else result.data
+            return result_data[0] if result_data else {}
             
         except Exception as e:
             logger.error(f"Error al actualizar resultado de predicción: {e}")
@@ -341,7 +348,7 @@ class PredictiveModelService:
                 "used_in_training": False
             }
             
-            result = self.supabase.table("model_training_data").insert(training_data).execute()
+            result = await self.supabase.table("model_training_data").insert(training_data).execute()
             
             # Actualizar contador de muestras de entrenamiento
             model = await self.get_model(model_name)
@@ -349,7 +356,8 @@ class PredictiveModelService:
                 samples = model.get("training_samples", 0) + 1
                 await self.update_model(model_name, model_params={"training_samples": samples})
             
-            return result.data[0] if result.data else {}
+            result_data = result.get("data", []) if isinstance(result, dict) else result.data
+            return result_data[0] if result_data else {}
             
         except Exception as e:
             logger.error(f"Error al añadir datos de entrenamiento: {e}")
@@ -375,8 +383,9 @@ class PredictiveModelService:
             if only_unused:
                 query = query.eq("used_in_training", False)
                 
-            result = query.execute()
-            return result.data if result.data else []
+            result = await query.execute()
+            result_data = result.get("data", []) if isinstance(result, dict) else result.data
+            return result_data if result_data else []
             
         except Exception as e:
             logger.error(f"Error al obtener datos de entrenamiento: {e}")
@@ -394,7 +403,7 @@ class PredictiveModelService:
         """
         try:
             for data_id in data_ids:
-                self.supabase.table("model_training_data").update({"used_in_training": True}).eq("id", data_id).execute()
+                await self.supabase.table("model_training_data").update({"used_in_training": True}).eq("id", data_id).execute()
             
             return True
             
@@ -451,10 +460,11 @@ class PredictiveModelService:
                 "created_at": datetime.now().isoformat()
             }
             
-            result = self.supabase.table("prediction_feedback").insert(feedback).execute()
+            result = await self.supabase.table("prediction_feedback").insert(feedback).execute()
             logger.info(f"Retroalimentación almacenada para predicción: {prediction_id}")
             
-            return result.data[0] if result.data else {}
+            result_data = result.get("data", []) if isinstance(result, dict) else result.data
+            return result_data[0] if result_data else {}
             
         except Exception as e:
             logger.error(f"Error al almacenar retroalimentación: {e}")
